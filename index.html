@@ -1,0 +1,2598 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InstaBox AI — Gemini Style Ollama Client</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+          colors: {
+            gemini: {
+              bg: '#131314',
+              sidebar: '#1e1f20',
+              surface: '#282a2c',
+              hover: '#333537',
+              border: '#3c4043',
+              text: '#e3e3e3',
+              muted: '#9aa0a6',
+              accent: '#8ab4f8',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Marked.js (Markdown Parser) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Highlight.js (Code Syntax Highlighting) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <!-- PDF.js (Untuk membaca isi file PDF di browser) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3c4043;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #5f6368;
+    }
+
+    /* Gradasi teks khas Gemini */
+    .gemini-gradient-text {
+      background: linear-gradient(90deg, #4285f4, #9b72cb, #d96570);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Styling Konten Markdown */
+    .markdown-body p {
+      margin-bottom: 0.75rem;
+      line-height: 1.7;
+    }
+    .markdown-body p:last-child {
+      margin-bottom: 0;
+    }
+    .markdown-body ul, .markdown-body ol {
+      margin-left: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .markdown-body ul { list-style-type: disc; }
+    .markdown-body ol { list-style-type: decimal; }
+    .markdown-body li { margin-bottom: 0.35rem; line-height: 1.65; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      font-weight: 600;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: #f1f3f4;
+    }
+    .markdown-body h1 { font-size: 1.35rem; }
+    .markdown-body h2 { font-size: 1.2rem; }
+    .markdown-body h3 { font-size: 1.05rem; }
+    .markdown-body code:not(pre code) {
+      background-color: #282a2c;
+      color: #8ab4f8;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.375rem;
+      font-size: 0.875em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .markdown-body pre {
+      margin: 0.85rem 0;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      border: 1px solid #3c4043;
+      background-color: #1e1f20;
+    }
+    .markdown-body pre code {
+      display: block;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.55;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.85rem 0;
+      font-size: 0.9rem;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid #3c4043;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    .markdown-body th {
+      background-color: #282a2c;
+      font-weight: 600;
+    }
+    .markdown-body blockquote {
+      border-left: 3px solid #8ab4f8;
+      padding-left: 1rem;
+      color: #9aa0a6;
+      margin: 0.75rem 0;
+    }
+
+    /* Animasi Sparkle Gemini */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(0.95); }
+    }
+    .ai-thinking-icon {
+      animation: pulse-glow 1.5s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-gemini-bg text-gemini-text font-sans antialiased h-screen overflow-hidden flex selection:bg-blue-500/30 selection:text-blue-200">
+
+  <!-- Backdrop Mobile Sidebar -->
+  <div id="sidebar-backdrop" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden backdrop-blur-xs transition-opacity"></div>
+
+  <!-- SIDEBAR KIRI (Riwayat Percakapan) -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-40 w-72 bg-gemini-sidebar flex flex-col justify-between transition-all duration-300 ease-in-out -translate-x-full md:translate-x-0 border-r border-white/5 shrink-0">
+    <div class="p-3 flex flex-col h-full overflow-hidden">
+      <!-- Top Bar Sidebar -->
+      <div class="flex items-center justify-between mb-4 px-1">
+        <button onclick="toggleSidebar()" class="p-2.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-gemini-text transition" title="Tutup/Buka Menu">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="text-xs font-medium tracking-wider uppercase text-gemini-muted">InstaBox VPS</span>
+      </div>
+
+      <!-- Tombol New Chat -->
+      <button onclick="createNewChat()" class="flex items-center gap-3 w-full py-3 px-4 rounded-2xl bg-gemini-surface hover:bg-gemini-hover text-sm font-medium text-gemini-text transition shadow-xs border border-white/5 mb-5">
+        <svg class="w-5 h-5 text-gemini-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        <span>Percakapan baru</span>
+      </button>
+
+      <!-- Label Riwayat -->
+      <div class="px-3 mb-2 flex items-center justify-between">
+        <span class="text-xs font-semibold text-gemini-muted">Terbaru</span>
+        <button onclick="clearAllChats()" class="text-[11px] text-gemini-muted hover:text-red-400 transition" title="Hapus semua riwayat">Hapus semua</button>
+      </div>
+
+      <!-- Daftar Riwayat Chat -->
+      <div id="chat-history-list" class="flex-1 overflow-y-auto space-y-1 pr-1">
+        <!-- Diisi via JavaScript -->
+      </div>
+
+      <!-- Footer Sidebar: Status Koneksi & Pengaturan -->
+      <div class="pt-3 mt-2 border-t border-white/10 space-y-1">
+        <button onclick="openSettingsModal()" class="flex items-center justify-between w-full p-2.5 rounded-xl hover:bg-gemini-hover text-sm text-gemini-text transition">
+          <div class="flex items-center gap-2.5">
+            <svg class="w-5 h-5 text-gemini-muted" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>Setelan Endpoint VPS</span>
+          </div>
+          <span id="sidebar-status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400" title="Status Koneksi Ollama"></span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- AREA UTAMA -->
+  <main class="flex-1 flex flex-col h-full min-w-0 relative bg-gemini-bg">
+
+    <!-- HEADER ATAS -->
+    <header class="h-16 px-4 flex items-center justify-between shrink-0 z-20 gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <!-- Tombol Buka Sidebar (Tampil saat sidebar tertutup / mobile) -->
+        <button id="open-sidebar-btn" onclick="toggleSidebar(true)" class="p-2.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-gemini-text transition md:hidden shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+
+        <!-- Pemilih Model Otomatis / Aktif -->
+        <div class="relative flex items-center gap-1.5 min-w-0">
+          <div class="flex items-center gap-2 bg-gemini-sidebar hover:bg-gemini-hover border border-white/10 rounded-xl px-3 py-1.5 transition min-w-0">
+            <!-- Ikon Sparkle Gemini -->
+            <svg class="w-5 h-5 text-blue-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C12.3 7.3 16.7 11.7 22 12C16.7 12.3 12.3 16.7 12 22C11.7 16.7 7.3 12.3 2 12C7.3 11.7 11.7 7.3 12 2Z"/>
+            </svg>
+            <select id="model-selector" onchange="handleModelChange(this.value)" class="bg-transparent text-sm font-medium text-gemini-text focus:outline-none cursor-pointer pr-1 max-w-[170px] sm:max-w-[230px] truncate" title="Daftar model dari server aktif">
+              <option value="" class="bg-gemini-sidebar text-gemini-muted">Memuat model...</option>
+            </select>
+          </div>
+
+          <!-- Tombol Refresh Daftar Model dari VPS -->
+          <button onclick="fetchInstalledModels(true)" id="refresh-models-btn" class="p-2 rounded-xl bg-gemini-sidebar hover:bg-gemini-hover border border-white/10 text-gemini-muted hover:text-gemini-text transition shrink-0" title="Sinkronkan ulang daftar model aktif dari VPS">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Kanan Header: Pemilih Cepat Multi-URL Publik & Pengaturan -->
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Pemilih Mode Routing: Langsung / Opsi 1-3 (oper-mengoper antar-VPS) -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gemini-sidebar hover:bg-gemini-hover border border-white/10 text-xs text-gemini-muted hover:text-gemini-text transition" title="Mode routing: langsung ke Ollama atau oper-mengoper antar-VPS">
+          <span id="mode-dot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+          <select id="mode-selector" onchange="handleModeChange(this.value)" class="bg-transparent text-xs text-gemini-text focus:outline-none cursor-pointer max-w-[104px] sm:max-w-[190px] truncate">
+            <option value="direct" class="bg-gemini-sidebar text-gemini-text">Mode Langsung</option>
+            <option value="opt1" class="bg-gemini-sidebar text-gemini-text">Opsi 1 · Coder + Vision</option>
+            <option value="opt2" class="bg-gemini-sidebar text-gemini-text">Opsi 2 · Harian + Gambar</option>
+            <option value="opt3" class="bg-gemini-sidebar text-gemini-text">Opsi 3 · Harian + Suara</option>
+          </select>
+        </div>
+        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gemini-sidebar hover:bg-gemini-hover border border-white/10 text-xs text-gemini-muted hover:text-gemini-text transition">
+          <span id="header-status-dot" class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+          <select id="header-endpoint-selector" onchange="switchActiveEndpoint(this.value)" class="bg-transparent text-xs text-gemini-text focus:outline-none cursor-pointer max-w-[210px] truncate" title="Pilih URL publik aktif">
+            <!-- Diisi otomatis via JS -->
+          </select>
+        </div>
+        <button onclick="openSettingsModal()" class="p-2.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-gemini-text transition" title="Kelola Banyak URL Publik & Pengaturan">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- AREA PESAN CHAT / WELCOME SCREEN -->
+    <div id="chat-scroll-container" class="flex-1 overflow-y-auto px-4 md:px-8 pb-6 scroll-smooth">
+      <div class="max-w-3xl mx-auto w-full h-full flex flex-col">
+
+        <!-- LAYAR SAPAAN AWAL (Tampil saat chat masih kosong) -->
+        <div id="welcome-screen" class="my-auto py-8 space-y-8">
+          <div class="space-y-2">
+            <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight">
+              <span class="gemini-gradient-text">Halo, Pengguna InstaBox</span>
+            </h1>
+            <p class="text-xl sm:text-2xl text-gemini-muted font-normal">
+              Apa yang ingin Anda kerjakan hari ini?
+            </p>
+          </div>
+
+          <!-- Kartu Saran Cepat -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <button onclick="usePromptSuggestion('Bantu selesaikan soal matematika dari foto yang saya unggah ini langkah demi langkah.')" class="text-left p-4 rounded-2xl bg-gemini-sidebar hover:bg-gemini-hover border border-white/5 transition flex flex-col justify-between h-36 group">
+              <span class="text-sm text-gemini-text leading-relaxed">Selesaikan soal matematika dari foto</span>
+              <div class="self-end p-2 rounded-full bg-gemini-bg text-blue-400 group-hover:scale-110 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+            </button>
+
+            <button onclick="usePromptSuggestion('Analisis screenshot error kode ini dan jelaskan cara memperbaikinya.')" class="text-left p-4 rounded-2xl bg-gemini-sidebar hover:bg-gemini-hover border border-white/5 transition flex flex-col justify-between h-36 group">
+              <span class="text-sm text-gemini-text leading-relaxed">Jelaskan error kode pada screenshot</span>
+              <div class="self-end p-2 rounded-full bg-gemini-bg text-purple-400 group-hover:scale-110 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+              </div>
+            </button>
+
+            <button onclick="usePromptSuggestion('Rangkum poin-poin penting dari dokumen atau catatan yang saya lampirkan ini.')" class="text-left p-4 rounded-2xl bg-gemini-sidebar hover:bg-gemini-hover border border-white/5 transition flex flex-col justify-between h-36 group">
+              <span class="text-sm text-gemini-text leading-relaxed">Rangkum isi file PDF atau catatan teks</span>
+              <div class="self-end p-2 rounded-full bg-gemini-bg text-emerald-400 group-hover:scale-110 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+            </button>
+
+            <button onclick="usePromptSuggestion('Buatkan komponen navbar responsif menggunakan HTML dan Tailwind CSS.')" class="text-left p-4 rounded-2xl bg-gemini-sidebar hover:bg-gemini-hover border border-white/5 transition flex flex-col justify-between h-36 group">
+              <span class="text-sm text-gemini-text leading-relaxed">Buatkan kode web HTML & JavaScript</span>
+              <div class="self-end p-2 rounded-full bg-gemini-bg text-rose-400 group-hover:scale-110 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- DAFTAR BUBBLE CHAT -->
+        <div id="messages-list" class="space-y-6 py-4 hidden">
+          <!-- Pesan dirender di sini -->
+        </div>
+
+      </div>
+    </div>
+
+    <!-- INPUT AREA BAWAH ALA GEMINI -->
+    <div class="px-4 md:px-8 pb-4 pt-2 bg-gemini-bg shrink-0">
+      <div class="max-w-3xl mx-auto">
+
+        <!-- Dropzone Overlay Saat Drag File -->
+        <div id="dropzone-banner" class="hidden mb-2 py-3 px-4 rounded-2xl border-2 border-dashed border-blue-400 bg-blue-500/10 text-center text-sm text-blue-300">
+          Lepaskan foto atau file di sini untuk melampirkan...
+        </div>
+
+        <!-- Kotak Input Utama -->
+        <div id="input-box-container" class="bg-gemini-sidebar border border-white/10 focus-within:border-white/25 rounded-3xl p-3 transition shadow-lg">
+
+          <!-- Preview Lampiran (Gambar & File Dokumen) -->
+          <div id="attachments-preview" class="hidden flex-wrap gap-2.5 mb-3 px-1">
+            <!-- Thumbnail gambar & chip dokumen muncul di sini -->
+          </div>
+
+          <!-- Textarea Prompt -->
+          <textarea
+            id="prompt-input"
+            rows="1"
+            placeholder="Tanya InstaBox AI, tempel screenshot (Ctrl+V), atau unggah file..."
+            class="w-full bg-transparent text-gemini-text placeholder-gemini-muted text-base px-2 py-1 focus:outline-none resize-none max-h-48 leading-relaxed"
+            oninput="autoResizeTextarea(this)"
+            onkeydown="handleInputKeydown(event)"
+          ></textarea>
+
+          <!-- Toolbar Bawah Kotak Input -->
+          <div class="flex items-center justify-between mt-2 pt-1 px-1">
+            <div class="flex items-center gap-1">
+              <!-- Input File Hidden (Gambar & Dokumen) -->
+              <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/webp" multiple class="hidden" onchange="handleFilesSelected(event, 'image')" />
+              <input type="file" id="doc-file-input" accept=".txt,.md,.js,.ts,.jsx,.tsx,.py,.html,.css,.json,.csv,.xml,.log,.pdf" multiple class="hidden" onchange="handleFilesSelected(event, 'doc')" />
+
+              <!-- Tombol Unggah Gambar -->
+              <button type="button" onclick="document.getElementById('image-file-input').click()" class="p-2.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-blue-400 transition flex items-center gap-1.5 text-xs font-medium" title="Unggah Foto / Screenshot (otomatis dikompres agar hemat RAM VPS)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span class="hidden sm:inline">Foto</span>
+              </button>
+
+              <!-- Tombol Unggah Dokumen / Kode / PDF -->
+              <button type="button" onclick="document.getElementById('doc-file-input').click()" class="p-2.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-emerald-400 transition flex items-center gap-1.5 text-xs font-medium" title="Unggah File Teks, Kode, atau PDF">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                <span class="hidden sm:inline">File / PDF</span>
+              </button>
+
+              <!-- Tombol Mikrofon Speech-to-Text (muncul pada Opsi 3) -->
+              <button type="button" id="mic-btn" onclick="toggleSpeechToText()" class="hidden p-2.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-rose-400 transition flex items-center gap-1.5 text-xs font-medium" title="Bicara untuk mengetik (Speech-to-Text)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                <span class="hidden sm:inline">Suara</span>
+              </button>
+            </div>
+
+            <!-- Tombol Kirim / Stop -->
+            <div class="flex items-center gap-2">
+              <button id="stop-btn" onclick="stopGeneration()" class="hidden px-3.5 py-2 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs font-medium flex items-center gap-1.5 transition">
+                <span class="w-2.5 h-2.5 rounded-xs bg-red-400"></span>
+                <span>Hentikan</span>
+              </button>
+
+              <button id="send-btn" onclick="sendMessage()" class="p-2.5 rounded-full bg-blue-500 hover:bg-blue-400 disabled:bg-gemini-surface disabled:text-gemini-muted text-slate-950 transition shadow-sm" title="Kirim pesan (Enter)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-center text-[11px] text-gemini-muted mt-2">
+          Terhubung ke Ollama VPS InstaBox • Multi-URL &amp; auto-deteksi model aktif • Foto otomatis dikompres ≤ 1024px.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL PENGATURAN MULTI-URL ENDPOINT VPS & PARAMETER -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-gemini-sidebar border border-white/10 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gemini-text flex items-center gap-2">
+          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/></svg>
+          <span>Konfigurasi Multi-URL &amp; Model Ollama</span>
+        </h2>
+        <button onclick="closeSettingsModal()" class="p-1.5 rounded-full hover:bg-gemini-hover text-gemini-muted hover:text-gemini-text">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-sm">
+        <!-- Daftar Multi-URL Publik -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-medium text-gemini-muted">Daftar URL Publik API Ollama (Bisa Lebih dari 1)</label>
+            <button type="button" onclick="testAllEndpoints()" class="text-[11px] text-blue-400 hover:text-blue-300 transition">Cek Semua Status</button>
+          </div>
+
+          <div id="endpoints-list-container" class="space-y-2 mb-2.5 max-h-44 overflow-y-auto pr-1">
+            <!-- Diisi via JS -->
+          </div>
+
+          <!-- Form Tambah URL Baru -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
+            <input type="text" id="new-endpoint-label" placeholder="Label (mis. Akun 2)" class="sm:col-span-4 bg-gemini-bg border border-white/15 rounded-xl px-3 py-2 text-gemini-text focus:outline-none focus:border-blue-400 text-xs" />
+            <input type="text" id="new-endpoint-url" placeholder="https://11434-....instabox.tech" class="sm:col-span-6 bg-gemini-bg border border-white/15 rounded-xl px-3 py-2 text-gemini-text focus:outline-none focus:border-blue-400 font-mono text-xs" />
+            <button type="button" onclick="addNewEndpoint()" class="sm:col-span-2 px-3 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-xs font-semibold text-blue-300 transition">
+              + Tambah
+            </button>
+          </div>
+          <p id="connection-test-result" class="text-xs mt-1.5 text-gemini-muted">
+            Pilih URL utama untuk mengecek &amp; memuat daftar model aktif secara otomatis.
+          </p>
+        </div>
+
+        <!-- Info Model Terdeteksi Otomatis -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-medium text-gemini-muted">Model Aktif di Endpoint Terpilih</label>
+            <button type="button" onclick="syncModelsForModal()" class="text-[11px] text-emerald-400 hover:text-emerald-300 transition">Muat Ulang Model</button>
+          </div>
+          <select id="setting-model-select" class="w-full bg-gemini-bg border border-white/15 rounded-xl px-3.5 py-2.5 text-gemini-text focus:outline-none focus:border-blue-400 font-mono text-xs">
+            <option value="">Memuat daftar model...</option>
+          </select>
+        </div>
+
+        <!-- Context Window (num_ctx) -->
+        <div>
+          <div class="flex justify-between text-xs mb-1.5">
+            <label class="font-medium text-gemini-muted">Batas Memori Konteks (<code class="text-blue-300">num_ctx</code>)</label>
+            <span id="ctx-value-label" class="font-mono text-blue-400">4096 token</span>
+          </div>
+          <input type="range" id="setting-num-ctx" min="2048" max="16384" step="1024" value="4096" oninput="document.getElementById('ctx-value-label').textContent = this.value + ' token'" class="w-full accent-blue-500 cursor-pointer" />
+          <p class="text-[11px] text-gemini-muted mt-1">Disarankan <b>4096</b> atau <b>8192</b> agar RAM di InstaBox tidak penuh.</p>
+        </div>
+
+        <!-- System Prompt -->
+        <div>
+          <label class="block text-xs font-medium text-gemini-muted mb-1.5">System Prompt (Instruksi Dasar AI)</label>
+          <textarea id="setting-system-prompt" rows="2" class="w-full bg-gemini-bg border border-white/15 rounded-xl px-3.5 py-2 text-gemini-text focus:outline-none focus:border-blue-400 text-xs leading-relaxed">Kamu adalah asisten AI cerdas yang membantu menjawab pertanyaan, menyelesaikan soal, dan menulis kode dengan jelas dalam bahasa Indonesia.</textarea>
+        </div>
+
+        <!-- Router Multi-VPS -->
+        <div class="space-y-2 pt-3 border-t border-white/10">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-medium text-gemini-muted">Router Multi-VPS (oper-mengoper antar-VPS)</label>
+            <button type="button" onclick="testRouter()" class="text-[11px] text-blue-400 hover:text-blue-300 transition">Tes Router</button>
+          </div>
+          <input type="text" id="setting-router-url" placeholder="/api/route" class="w-full bg-gemini-bg border border-white/15 rounded-xl px-3.5 py-2 text-gemini-text focus:outline-none focus:border-blue-400 font-mono text-xs" />
+          <p id="router-test-result" class="text-[11px] text-gemini-muted leading-relaxed">
+            Default same-origin: <code class="text-blue-300">/api/route</code>. Pilih mode lewat menu di header. Jika URL router dikosongkan atau Mode Langsung dipilih, chat dikirim langsung ke Ollama aktif seperti biasa.
+          </p>
+
+          <!-- Diisi via JS: URL & model VPS untuk Opsi 1, 2, dan 3 -->
+          <div id="routing-options-container" class="space-y-2"></div>
+
+          <details class="group rounded-2xl bg-gemini-bg border border-white/10 overflow-hidden">
+            <summary class="px-3.5 py-2 text-[11px] font-medium text-gemini-muted hover:text-gemini-text cursor-pointer flex items-center gap-2 select-none">
+              <svg class="w-3.5 h-3.5 text-purple-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+              <span>Kontrak API router (untuk pembuat backend)</span>
+            </summary>
+<pre class="px-4 py-2.5 text-[10px] leading-relaxed text-gemini-muted font-mono bg-black/20 border-t border-white/5 overflow-x-auto whitespace-pre">POST {URL router}  (JSON)
+{
+  "mode": "opt1 | opt2 | opt3",
+  "session": "chat_...",
+  "prompt": "pesan terakhir pengguna",
+  "images": ["base64", ...],
+  "intent": { "has_images", "image_gen", "image_edit",
+              "image_read", "tts" },
+  "messages": [{ "role", "content", "images?" }],
+  "vps": { "&lt;peran&gt;": { "url", "model" } },
+  "options": { "num_ctx": 4096 },
+  "hints": { "handoff_marker": "[OPER_VPS2]", ... },
+  "stream": true
+}
+Peran: opt1 = coder, vision | opt2 = daily, image
+       opt3 = daily, voice
+Ping:  {"ping": true}  -&gt; balas HTTP 200
+
+Respons: NDJSON (1 JSON per baris) atau JSON tunggal
+{"trace": {"role":"vision","model":"llava","ms":900,"note":"..."}}
+{"message": {"content": "potongan teks"}}
+{"image": "url | data-url | base64"}
+{"audio": "url | data-url | base64"}
+{"error": "pesan"}
+- trace objek = tambah 1 langkah; trace array = ganti semua
+- role trace: coder, vision, daily, image, voice
+- boleh juga membalas langsung audio/* atau image/*
+- fallback ke Mode Langsung otomatis bila router
+  tidak terjangkau / HTTP 404, 405, 501</pre>
+          </details>
+        </div>
+
+        <!-- Firebase Realtime Database (opsional) -->
+        <div class="space-y-2 pt-3 border-t border-white/10">
+          <div class="flex items-center justify-between gap-2">
+            <label class="flex items-center gap-2 text-xs font-medium text-gemini-muted cursor-pointer">
+              <input type="checkbox" id="setting-fb-enabled" class="accent-blue-500 cursor-pointer" />
+              <span>Catat log routing ke Firebase Realtime Database (opsional)</span>
+            </label>
+            <button type="button" onclick="testFirebaseLog()" class="text-[11px] text-blue-400 hover:text-blue-300 transition shrink-0">Tes Log</button>
+          </div>
+          <input type="text" id="setting-fb-url" placeholder="https://nama-proyek-default-rtdb.firebaseio.com" class="w-full bg-gemini-bg border border-white/15 rounded-xl px-3.5 py-2 text-gemini-text focus:outline-none focus:border-blue-400 font-mono text-xs" />
+          <input type="password" id="setting-fb-secret" autocomplete="off" placeholder="Secret / auth token (opsional)" class="w-full bg-gemini-bg border border-white/15 rounded-xl px-3.5 py-2 text-gemini-text focus:outline-none focus:border-blue-400 font-mono text-xs" />
+          <p id="fb-test-result" class="text-[11px] text-gemini-muted leading-relaxed">
+            Log berisi mode, jejak operan, durasi &amp; status ke path <code class="text-blue-300">/routing_logs</code>; isi pesan tidak dikirim. Firebase tidak wajib. Lebih aman mengosongkan secret dan mengatur Rules database agar path tersebut boleh ditulis.
+          </p>
+        </div>
+
+        <!-- Info CORS -->
+        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-1">
+          <p class="font-semibold">Penting jika diakses dari browser/hosting luar:</p>
+          <p class="text-[11px] leading-relaxed">Pastikan di terminal VPS InstaBox Anda sudah menambahkan <code class="bg-black/40 px-1 py-0.5 rounded">OLLAMA_ORIGINS="*"</code> dan <code class="bg-black/40 px-1 py-0.5 rounded">OLLAMA_HOST=0.0.0.0:11434</code> saat menjalankan <code class="bg-black/40 px-1 py-0.5 rounded">ollama serve</code> agar tidak terblokir CORS.</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl hover:bg-gemini-hover text-xs font-medium text-gemini-muted transition">Batal</button>
+        <button onclick="saveSettings()" class="px-5 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-slate-950 text-xs font-semibold transition">Simpan Setelan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-gemini-surface border border-white/15 text-xs text-gemini-text shadow-xl opacity-0 pointer-events-none transition-opacity duration-300">
+    Pesan notifikasi
+  </div>
+
+  <script>
+    // Konfigurasi PDF.js Worker
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // Konfigurasi Marked.js
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+    });
+
+    // ==========================================
+    // STATE APLIKASI
+    // ==========================================
+    const INITIAL_ENDPOINTS = [
+      {
+        id: 'ep_default',
+        label: 'InstaBox Utama',
+        url: 'https://11434-agq7y7vjykplezojspm3uax7zy.instabox.tech',
+        status: 'unknown'
+      }
+    ];
+
+    // ==========================================
+    // ROUTING MULTI-VPS: KONSTANTA & SKEMA
+    // ==========================================
+    const ROUTE_MODES = ['direct', 'opt1', 'opt2', 'opt3'];
+
+    const ROUTE_SCHEMA = {
+      opt1: {
+        short: 'Opsi 1',
+        title: 'Opsi 1 — Coder + Vision',
+        desc: 'Ada gambar (mis. screenshot error): dibaca VPS Vision lebih dulu, hasilnya dioper ke VPS Coder. Teks/kode saja: ke VPS Coder; bila Coder menandai [OPER_VPS2], dioper ke VPS Vision.',
+        roles: [
+          { key: 'coder',  label: 'VPS 1 · Coder',           urlPh: 'https://11434-coder.instabox.tech',  modelPh: 'qwen2.5-coder:7b' },
+          { key: 'vision', label: 'VPS 2 · Vision / Reader', urlPh: 'https://11434-vision.instabox.tech', modelPh: 'llava:7b' }
+        ]
+      },
+      opt2: {
+        short: 'Opsi 2',
+        title: 'Opsi 2 — Harian + Gambar',
+        desc: 'Chat sehari-hari ke VPS Harian. Permintaan buat/baca/edit gambar (atau kirim gambar) dioper ke VPS Gambar.',
+        roles: [
+          { key: 'daily', label: 'VPS 1 · Harian', urlPh: 'https://11434-harian.instabox.tech', modelPh: 'llama3.2:3b' },
+          { key: 'image', label: 'VPS 2 · Gambar', urlPh: 'https://gambar.instabox.tech',       modelPh: 'sdxl / llava:7b' }
+        ]
+      },
+      opt3: {
+        short: 'Opsi 3',
+        title: 'Opsi 3 — Harian + Suara (TTS / STT)',
+        desc: 'Chat sehari-hari ke VPS Harian. Permintaan teks ke suara (TTS) dioper ke VPS Suara dan audionya diputar otomatis. Tombol mikrofon (STT) muncul di toolbar input.',
+        roles: [
+          { key: 'daily', label: 'VPS 1 · Harian', urlPh: 'https://11434-harian.instabox.tech', modelPh: 'llama3.2:3b' },
+          { key: 'voice', label: 'VPS 2 · Suara',  urlPh: 'https://suara.instabox.tech',        modelPh: 'tts-1 / piper' }
+        ]
+      }
+    };
+
+    const MODE_LABELS = {
+      direct: 'Mode Langsung',
+      opt1: 'Opsi 1 · Coder + Vision',
+      opt2: 'Opsi 2 · Harian + Gambar',
+      opt3: 'Opsi 3 · Harian + Suara'
+    };
+
+    // Petunjuk yang ikut dikirim ke router agar backend memakai instruksi yang konsisten
+    const ROUTE_HINTS = {
+      handoff_marker: '[OPER_VPS2]',
+      vision_prompt: 'Baca gambar ini dengan teliti lalu ubah menjadi teks terstruktur dalam bahasa Indonesia: (1) ringkasan isi, (2) seluruh teks/kode/pesan error yang terbaca persis apa adanya, (3) detail visual penting (UI, grafik, tabel). Jangan menebak hal yang tidak terlihat.',
+      coder_handoff_instruction: 'Jika jawabanmu membutuhkan pembacaan gambar atau bantuan visual yang tidak tersedia, balas HANYA dengan penanda [OPER_VPS2] diikuti ringkasan singkat apa yang perlu dilihat.'
+    };
+
+    const TRACE_ROLE_META = {
+      coder:  { label: 'Coder',    dot: 'bg-purple-400',  chip: 'text-purple-200 bg-purple-500/10 border-purple-400/25' },
+      vision: { label: 'Vision',   dot: 'bg-blue-400',    chip: 'text-blue-200 bg-blue-500/10 border-blue-400/25' },
+      daily:  { label: 'Harian',   dot: 'bg-emerald-400', chip: 'text-emerald-200 bg-emerald-500/10 border-emerald-400/25' },
+      image:  { label: 'Gambar',   dot: 'bg-amber-400',   chip: 'text-amber-200 bg-amber-500/10 border-amber-400/25' },
+      voice:  { label: 'Suara',    dot: 'bg-cyan-400',    chip: 'text-cyan-200 bg-cyan-500/10 border-cyan-400/25' },
+      direct: { label: 'Langsung', dot: 'bg-slate-400',   chip: 'text-slate-200 bg-slate-500/10 border-slate-400/25' },
+      router: { label: 'Router',   dot: 'bg-slate-400',   chip: 'text-slate-200 bg-slate-500/10 border-slate-400/25' }
+    };
+
+    function makeDefaultRouting() {
+      const r = {
+        mode: 'direct',
+        routerUrl: '/api/route',
+        firebase: { enabled: false, dbUrl: '', secret: '' }
+      };
+      Object.entries(ROUTE_SCHEMA).forEach(([optKey, def]) => {
+        r[optKey] = {};
+        def.roles.forEach(role => { r[optKey][role.key] = { url: '', model: '' }; });
+      });
+      return r;
+    }
+
+    function normalizeRouting(saved) {
+      const base = makeDefaultRouting();
+      if (!saved || typeof saved !== 'object') return base;
+
+      if (ROUTE_MODES.includes(saved.mode)) base.mode = saved.mode;
+      if (typeof saved.routerUrl === 'string') base.routerUrl = saved.routerUrl;
+
+      Object.entries(ROUTE_SCHEMA).forEach(([optKey, def]) => {
+        def.roles.forEach(role => {
+          const savedRole = saved[optKey] && saved[optKey][role.key];
+          if (savedRole && typeof savedRole === 'object') {
+            base[optKey][role.key].url = typeof savedRole.url === 'string' ? savedRole.url : '';
+            base[optKey][role.key].model = typeof savedRole.model === 'string' ? savedRole.model : '';
+          }
+        });
+      });
+
+      if (saved.firebase && typeof saved.firebase === 'object') {
+        base.firebase = {
+          enabled: !!saved.firebase.enabled,
+          dbUrl: typeof saved.firebase.dbUrl === 'string' ? saved.firebase.dbUrl : '',
+          secret: typeof saved.firebase.secret === 'string' ? saved.firebase.secret : ''
+        };
+      }
+      return base;
+    }
+
+    const DEFAULT_SETTINGS = {
+      activeEndpointId: 'ep_default',
+      endpoints: INITIAL_ENDPOINTS,
+      model: '',
+      numCtx: 4096,
+      routing: makeDefaultRouting(),
+      systemPrompt: 'Kamu adalah asisten AI cerdas yang membantu menjawab pertanyaan, menyelesaikan soal, dan menulis kode dengan jelas dalam bahasa Indonesia.'
+    };
+
+    function loadInitialSettings() {
+      const saved = JSON.parse(localStorage.getItem('instabox_ai_settings') || 'null');
+      if (!saved) return { ...DEFAULT_SETTINGS, endpoints: [...INITIAL_ENDPOINTS], routing: makeDefaultRouting() };
+
+      // Migrasi jika format lama memakai `endpoint` string tunggal
+      let endpoints = Array.isArray(saved.endpoints) && saved.endpoints.length > 0
+        ? saved.endpoints
+        : [{
+            id: 'ep_default',
+            label: 'InstaBox Utama',
+            url: (saved.endpoint || DEFAULT_SETTINGS.endpoints[0].url).replace(/\/+$/, ''),
+            status: 'unknown'
+          }];
+
+      const activeId = endpoints.some(e => e.id === saved.activeEndpointId)
+        ? saved.activeEndpointId
+        : endpoints[0].id;
+
+      return {
+        activeEndpointId: activeId,
+        endpoints,
+        model: saved.model || '',
+        numCtx: saved.numCtx || 4096,
+        systemPrompt: saved.systemPrompt || DEFAULT_SETTINGS.systemPrompt,
+        routing: normalizeRouting(saved.routing)
+      };
+    }
+
+    function getActiveEndpoint() {
+      const found = settings.endpoints.find(e => e.id === settings.activeEndpointId);
+      return found || settings.endpoints[0];
+    }
+
+    function getActiveEndpointUrl() {
+      return (getActiveEndpoint()?.url || '').replace(/\/+$/, '');
+    }
+
+    let settings = loadInitialSettings();
+    let chats = JSON.parse(localStorage.getItem('instabox_ai_chats')) || [];
+    let currentChatId = null;
+    let pendingAttachments = []; // { id, type: 'image'|'doc', name, previewUrl, base64, content }
+    let abortController = null;
+    let isGenerating = false;
+    let discoveredModels = []; // { name, running, details }
+
+    // ==========================================
+    // INISIALISASI SAAT HALAMAN DIMUAT
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', async () => {
+      renderHeaderEndpointDropdown();
+      renderModelDropdown(discoveredModels);
+      renderChatHistory();
+
+      if (chats.length > 0) {
+        loadChat(chats[0].id);
+      } else {
+        createNewChat(false);
+        loadChat(chats[0].id);
+      }
+
+      updateModeUI();
+      setupDragAndDrop();
+      setupClipboardPaste();
+      await fetchInstalledModels(false);
+    });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0');
+      setTimeout(() => toast.classList.add('opacity-0'), 2800);
+    }
+
+    // ==========================================
+    // PENGATURAN MULTI-URL & DETEKSI MODEL AKTIF
+    // ==========================================
+    function renderHeaderEndpointDropdown() {
+      const select = document.getElementById('header-endpoint-selector');
+      if (!select) return;
+      select.innerHTML = '';
+
+      settings.endpoints.forEach(ep => {
+        const opt = document.createElement('option');
+        opt.value = ep.id;
+        const shortHost = ep.url.replace(/^https?:\/\//, '');
+        opt.textContent = `${ep.label} (${shortHost})`;
+        opt.className = 'bg-gemini-sidebar text-gemini-text';
+        select.appendChild(opt);
+      });
+
+      select.value = settings.activeEndpointId;
+    }
+
+    async function switchActiveEndpoint(endpointId) {
+      if (!endpointId || endpointId === settings.activeEndpointId) return;
+      settings.activeEndpointId = endpointId;
+      localStorage.setItem('instabox_ai_settings', JSON.stringify(settings));
+      renderHeaderEndpointDropdown();
+      const ep = getActiveEndpoint();
+      showToast(`Beralih ke ${ep ? ep.label : 'endpoint baru'}`);
+      await fetchInstalledModels(false);
+    }
+
+    function openSettingsModal() {
+      renderEndpointsInModal();
+      document.getElementById('setting-num-ctx').value = settings.numCtx;
+      document.getElementById('ctx-value-label').textContent = settings.numCtx + ' token';
+      document.getElementById('setting-system-prompt').value = settings.systemPrompt;
+      populateModalModelSelect(discoveredModels);
+      renderRoutingSettingsForm();
+
+      const modal = document.getElementById('settings-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeSettingsModal() {
+      const modal = document.getElementById('settings-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderEndpointsInModal() {
+      const container = document.getElementById('endpoints-list-container');
+      container.innerHTML = '';
+
+      settings.endpoints.forEach(ep => {
+        const isSelected = ep.id === settings.activeEndpointId;
+        const row = document.createElement('div');
+        row.className = `flex items-center justify-between gap-2 p-2.5 rounded-xl border text-xs transition ${
+          isSelected
+            ? 'bg-blue-500/10 border-blue-400/40 text-gemini-text'
+            : 'bg-gemini-bg border-white/10 text-gemini-muted hover:text-gemini-text'
+        }`;
+
+        const badgeColor =
+          ep.status === 'online' ? 'bg-emerald-400' :
+          ep.status === 'offline' ? 'bg-red-400' : 'bg-amber-400';
+
+        row.innerHTML = `
+          <label class="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
+            <input type="radio" name="activeEndpointRadio" ${isSelected ? 'checked' : ''} onchange="selectEndpointInModal('${ep.id}')" class="accent-blue-500 cursor-pointer shrink-0" />
+            <span class="w-2 h-2 rounded-full ${badgeColor} shrink-0"></span>
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-gemini-text truncate">${escapeHtml(ep.label)}</div>
+              <div class="font-mono text-[11px] text-gemini-muted truncate">${escapeHtml(ep.url)}</div>
+            </div>
+          </label>
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" onclick="testSingleEndpoint('${ep.id}')" class="px-2 py-1 rounded-lg bg-gemini-surface hover:bg-gemini-hover text-[11px] text-blue-300 transition">Tes</button>
+            ${settings.endpoints.length > 1 ? `
+              <button type="button" onclick="removeEndpoint('${ep.id}')" class="p-1.5 rounded-lg hover:bg-red-500/20 text-gemini-muted hover:text-red-400 transition" title="Hapus URL">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            ` : ''}
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    async function selectEndpointInModal(endpointId) {
+      settings.activeEndpointId = endpointId;
+      renderEndpointsInModal();
+      await syncModelsForModal();
+    }
+
+    function addNewEndpoint() {
+      const labelInput = document.getElementById('new-endpoint-label');
+      const urlInput = document.getElementById('new-endpoint-url');
+      let rawUrl = urlInput.value.trim().replace(/\/+$/, '');
+      const rawLabel = labelInput.value.trim();
+
+      if (!rawUrl) {
+        showToast('Masukkan URL publik terlebih dahulu');
+        urlInput.focus();
+        return;
+      }
+
+      if (!/^https?:\/\//i.test(rawUrl)) {
+        rawUrl = 'https://' + rawUrl;
+      }
+
+      const newEp = {
+        id: 'ep_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+        label: rawLabel || `InstaBox ${settings.endpoints.length + 1}`,
+        url: rawUrl,
+        status: 'unknown'
+      };
+
+      settings.endpoints.push(newEp);
+      settings.activeEndpointId = newEp.id;
+      labelInput.value = '';
+      urlInput.value = '';
+
+      renderEndpointsInModal();
+      renderHeaderEndpointDropdown();
+      syncModelsForModal();
+      showToast('URL baru ditambahkan');
+    }
+
+    function removeEndpoint(endpointId) {
+      if (settings.endpoints.length <= 1) return;
+      settings.endpoints = settings.endpoints.filter(e => e.id !== endpointId);
+      if (settings.activeEndpointId === endpointId) {
+        settings.activeEndpointId = settings.endpoints[0].id;
+      }
+      renderEndpointsInModal();
+      renderHeaderEndpointDropdown();
+      syncModelsForModal();
+    }
+
+    async function testSingleEndpoint(endpointId) {
+      const ep = settings.endpoints.find(e => e.id === endpointId);
+      const resultEl = document.getElementById('connection-test-result');
+      if (!ep) return;
+
+      resultEl.className = 'text-xs mt-1.5 text-amber-300';
+      resultEl.textContent = `Mengecek ${ep.label} (${ep.url})...`;
+
+      try {
+        const res = await fetch(`${ep.url}/api/tags`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        ep.status = 'online';
+        renderEndpointsInModal();
+
+        const names = (data.models || []).map(m => m.name);
+        resultEl.className = 'text-xs mt-1.5 text-emerald-400';
+        resultEl.textContent = names.length
+          ? `${ep.label} online! Model tersedia: ${names.join(', ')}`
+          : `${ep.label} online, tetapi belum ada model yang di-pull.`;
+      } catch (err) {
+        ep.status = 'offline';
+        renderEndpointsInModal();
+        resultEl.className = 'text-xs mt-1.5 text-red-400';
+        resultEl.textContent = `${ep.label} gagal terhubung (${err.message}).`;
+      }
+    }
+
+    async function testAllEndpoints() {
+      const resultEl = document.getElementById('connection-test-result');
+      resultEl.className = 'text-xs mt-1.5 text-amber-300';
+      resultEl.textContent = `Mengecek ${settings.endpoints.length} URL endpoint...`;
+
+      let onlineCount = 0;
+      await Promise.all(settings.endpoints.map(async ep => {
+        try {
+          const res = await fetch(`${ep.url}/api/tags`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          ep.status = 'online';
+          onlineCount++;
+        } catch (_) {
+          ep.status = 'offline';
+        }
+      }));
+
+      renderEndpointsInModal();
+      resultEl.className = onlineCount > 0 ? 'text-xs mt-1.5 text-emerald-400' : 'text-xs mt-1.5 text-red-400';
+      resultEl.textContent = `Selesai: ${onlineCount} dari ${settings.endpoints.length} URL merespons dengan baik.`;
+    }
+
+    async function syncModelsForModal() {
+      const select = document.getElementById('setting-model-select');
+      const resultEl = document.getElementById('connection-test-result');
+      select.innerHTML = '<option value="">Memuat daftar model...</option>';
+
+      const models = await queryModelsFromServer(getActiveEndpointUrl());
+      if (models) {
+        discoveredModels = models;
+        populateModalModelSelect(models);
+        renderModelDropdown(models);
+        resultEl.className = 'text-xs mt-1.5 text-emerald-400';
+        resultEl.textContent = models.length
+          ? `Terdeteksi ${models.length} model di server aktif.`
+          : 'Server aktif, namun belum ada model terinstal.';
+      } else {
+        select.innerHTML = `<option value="${escapeHtml(settings.model)}">${escapeHtml(settings.model || 'Tidak dapat memuat model (offline)')}</option>`;
+        resultEl.className = 'text-xs mt-1.5 text-red-400';
+        resultEl.textContent = 'Gagal mengambil daftar model otomatis dari endpoint terpilih.';
+      }
+    }
+
+    function populateModalModelSelect(models) {
+      const select = document.getElementById('setting-model-select');
+      select.innerHTML = '';
+
+      if (!models || models.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = settings.model || '';
+        opt.textContent = settings.model ? `${settings.model} (tersimpan)` : 'Belum ada model terdeteksi';
+        select.appendChild(opt);
+        return;
+      }
+
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        const sizeGb = m.size ? ` • ${(m.size / (1024 ** 3)).toFixed(1)} GB` : '';
+        const activeTag = m.running ? ' [Sedang dimuat]' : '';
+        opt.textContent = `${m.name}${sizeGb}${activeTag}`;
+        opt.className = 'bg-gemini-bg text-gemini-text';
+        select.appendChild(opt);
+      });
+
+      if (models.some(m => m.name === settings.model)) {
+        select.value = settings.model;
+      } else {
+        const preferred = models.find(m => m.running) || models[0];
+        select.value = preferred.name;
+      }
+    }
+
+    function saveSettings() {
+      const selectedModel = document.getElementById('setting-model-select').value;
+      const numCtx = parseInt(document.getElementById('setting-num-ctx').value, 10) || 4096;
+      const systemPrompt = document.getElementById('setting-system-prompt').value.trim();
+
+      if (selectedModel) {
+        settings.model = selectedModel;
+      }
+      settings.numCtx = numCtx;
+      settings.systemPrompt = systemPrompt;
+      const routingWarning = readRoutingSettingsFromForm();
+
+      localStorage.setItem('instabox_ai_settings', JSON.stringify(settings));
+      renderHeaderEndpointDropdown();
+      renderModelDropdown(discoveredModels);
+      closeSettingsModal();
+      showToast(routingWarning || 'Setelan multi-URL, model & routing disimpan');
+      fetchInstalledModels(false);
+    }
+
+    function handleModelChange(val) {
+      if (!val) return;
+      settings.model = val;
+      localStorage.setItem('instabox_ai_settings', JSON.stringify(settings));
+      showToast(`Model aktif: ${val}`);
+    }
+
+    function updateStatusDots(status) {
+      const colors = {
+        online: 'bg-emerald-400',
+        offline: 'bg-red-400',
+        checking: 'bg-amber-400'
+      };
+      const ep = getActiveEndpoint();
+      if (ep) ep.status = status;
+
+      ['sidebar-status-dot', 'header-status-dot'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.className = `w-2.5 h-2.5 rounded-full ${colors[status] || colors.checking}`;
+        }
+      });
+    }
+
+    // Mengambil daftar model (/api/tags) + model yang sedang berjalan di memori (/api/ps)
+    async function queryModelsFromServer(baseUrl) {
+      if (!baseUrl) return null;
+      try {
+        const tagsRes = await fetch(`${baseUrl}/api/tags`, { method: 'GET' });
+        if (!tagsRes.ok) throw new Error(`HTTP ${tagsRes.status}`);
+        const tagsData = await tagsRes.json();
+        const rawModels = tagsData.models || [];
+
+        let runningNames = new Set();
+        try {
+          const psRes = await fetch(`${baseUrl}/api/ps`, { method: 'GET' });
+          if (psRes.ok) {
+            const psData = await psRes.json();
+            runningNames = new Set((psData.models || []).map(rm => rm.name));
+          }
+        } catch (_) {
+          // /api/ps opsional apabila proxy membatasi path tertentu
+        }
+
+        return rawModels.map(m => ({
+          name: m.name,
+          size: m.size || 0,
+          running: runningNames.has(m.name)
+        }));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function fetchInstalledModels(showNotification = false) {
+      const btn = document.getElementById('refresh-models-btn');
+      if (btn) btn.classList.add('animate-spin');
+      updateStatusDots('checking');
+
+      const models = await queryModelsFromServer(getActiveEndpointUrl());
+      if (models) {
+        discoveredModels = models;
+        updateStatusDots('online');
+        renderModelDropdown(models);
+        if (showNotification) {
+          showToast(`Terdeteksi ${models.length} model aktif di server`);
+        }
+      } else {
+        updateStatusDots('offline');
+        renderModelDropdown(discoveredModels);
+        if (showNotification) {
+          showToast('Gagal mengambil daftar model dari server aktif');
+        }
+      }
+
+      if (btn) btn.classList.remove('animate-spin');
+    }
+
+    function renderModelDropdown(models) {
+      const selector = document.getElementById('model-selector');
+      selector.innerHTML = '';
+
+      if (!models || models.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = settings.model || '';
+        opt.textContent = settings.model ? `${settings.model} (tersimpan)` : 'Belum ada model terdeteksi';
+        opt.className = 'bg-gemini-sidebar text-gemini-text';
+        selector.appendChild(opt);
+        return;
+      }
+
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.running ? `● ${m.name} (aktif)` : m.name;
+        opt.className = 'bg-gemini-sidebar text-gemini-text';
+        selector.appendChild(opt);
+      });
+
+      if (models.some(m => m.name === settings.model)) {
+        selector.value = settings.model;
+      } else {
+        const activeOrFirst = models.find(m => m.running) || models[0];
+        selector.value = activeOrFirst.name;
+        settings.model = activeOrFirst.name;
+        localStorage.setItem('instabox_ai_settings', JSON.stringify(settings));
+      }
+    }
+
+    // ==========================================
+    // MANAJEMEN RIWAYAT PERCAKAPAN (LOCALSTORAGE)
+    // ==========================================
+    function saveChatsToStorage() {
+      try {
+        localStorage.setItem('instabox_ai_chats', JSON.stringify(chats));
+      } catch (e) {
+        console.warn('LocalStorage penuh, memangkas lampiran lama:', e);
+      }
+    }
+
+    function createNewChat(switchImmediately = true) {
+      const newChat = {
+        id: 'chat_' + Date.now(),
+        title: 'Percakapan baru',
+        messages: [],
+        updatedAt: Date.now()
+      };
+      chats.unshift(newChat);
+      saveChatsToStorage();
+      renderChatHistory();
+      if (switchImmediately) {
+        loadChat(newChat.id);
+        toggleSidebar(false);
+      }
+    }
+
+    function loadChat(chatId) {
+      currentChatId = chatId;
+      const chat = chats.find(c => c.id === chatId);
+      if (!chat) return;
+
+      renderChatHistory();
+      const welcomeEl = document.getElementById('welcome-screen');
+      const messagesEl = document.getElementById('messages-list');
+
+      if (chat.messages.length === 0) {
+        welcomeEl.classList.remove('hidden');
+        messagesEl.classList.add('hidden');
+        messagesEl.innerHTML = '';
+      } else {
+        welcomeEl.classList.add('hidden');
+        messagesEl.classList.remove('hidden');
+        messagesEl.innerHTML = '';
+        chat.messages.forEach(msg => appendMessageToDOM(msg));
+        scrollToBottom();
+      }
+    }
+
+    function deleteChat(event, chatId) {
+      event.stopPropagation();
+      chats = chats.filter(c => c.id !== chatId);
+      saveChatsToStorage();
+      if (currentChatId === chatId) {
+        if (chats.length > 0) {
+          loadChat(chats[0].id);
+        } else {
+          createNewChat(true);
+        }
+      } else {
+        renderChatHistory();
+      }
+    }
+
+    function clearAllChats() {
+      chats = [];
+      saveChatsToStorage();
+      createNewChat(true);
+      showToast('Semua riwayat dihapus');
+    }
+
+    function renderChatHistory() {
+      const listEl = document.getElementById('chat-history-list');
+      listEl.innerHTML = '';
+
+      chats.forEach(chat => {
+        const isActive = chat.id === currentChatId;
+        const item = document.createElement('div');
+        item.onclick = () => { loadChat(chat.id); toggleSidebar(false); };
+        item.className = `group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm transition ${
+          isActive ? 'bg-blue-500/15 text-blue-200 font-medium' : 'text-gemini-text hover:bg-gemini-hover'
+        }`;
+
+        item.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <svg class="w-4 h-4 shrink-0 ${isActive ? 'text-blue-400' : 'text-gemini-muted'}" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+            <span class="truncate">${escapeHtml(chat.title)}</span>
+          </div>
+          <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-white/10 text-gemini-muted hover:text-red-400 transition" title="Hapus chat">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    function toggleSidebar(forceState) {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      const isMobile = window.innerWidth < 768;
+
+      if (isMobile) {
+        const shouldOpen = typeof forceState === 'boolean' ? forceState : sidebar.classList.contains('-translate-x-full');
+        if (shouldOpen) {
+          sidebar.classList.remove('-translate-x-full');
+          backdrop.classList.remove('hidden');
+        } else {
+          sidebar.classList.add('-translate-x-full');
+          backdrop.classList.add('hidden');
+        }
+      } else {
+        sidebar.classList.toggle('hidden');
+        const openBtn = document.getElementById('open-sidebar-btn');
+        if (sidebar.classList.contains('hidden')) {
+          openBtn.classList.remove('md:hidden');
+        } else {
+          openBtn.classList.add('md:hidden');
+        }
+      }
+    }
+
+    // ==========================================
+    // PENANGANAN FOTO & FILE (KOMPRESI + PDF/TEKS)
+    // ==========================================
+    function setupDragAndDrop() {
+      const body = document.body;
+      const banner = document.getElementById('dropzone-banner');
+
+      body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        banner.classList.remove('hidden');
+      });
+
+      body.addEventListener('dragleave', (e) => {
+        if (e.relatedTarget === null) {
+          banner.classList.add('hidden');
+        }
+      });
+
+      body.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        banner.classList.add('hidden');
+        if (e.dataTransfer?.files?.length) {
+          await processUploadedFiles(Array.from(e.dataTransfer.files));
+        }
+      });
+    }
+
+    function setupClipboardPaste() {
+      document.getElementById('prompt-input').addEventListener('paste', async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        const files = [];
+        for (const item of items) {
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) files.push(file);
+          }
+        }
+        if (files.length > 0) {
+          e.preventDefault();
+          await processUploadedFiles(files);
+        }
+      });
+    }
+
+    async function handleFilesSelected(event, hintType) {
+      const files = Array.from(event.target.files || []);
+      if (files.length > 0) {
+        await processUploadedFiles(files);
+      }
+      event.target.value = '';
+    }
+
+    async function processUploadedFiles(files) {
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          try {
+            const compressed = await compressImageToBase64(file, 1024, 0.85);
+            pendingAttachments.push({
+              id: 'att_' + Date.now() + Math.random().toString(36).slice(2, 6),
+              type: 'image',
+              name: file.name || 'screenshot.jpg',
+              previewUrl: compressed.dataUrl,
+              base64: compressed.rawBase64
+            });
+          } catch (err) {
+            showToast(`Gagal memproses gambar ${file.name}`);
+          }
+        } else {
+          try {
+            const textContent = await extractTextFromFile(file);
+            pendingAttachments.push({
+              id: 'att_' + Date.now() + Math.random().toString(36).slice(2, 6),
+              type: 'doc',
+              name: file.name,
+              content: textContent
+            });
+          } catch (err) {
+            showToast(`Gagal membaca file ${file.name}: ${err.message}`);
+          }
+        }
+      }
+      renderAttachmentsPreview();
+    }
+
+    function compressImageToBase64(file, maxDimension = 1024, quality = 0.85) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const rawBase64 = dataUrl.split(',')[1];
+            resolve({ dataUrl, rawBase64 });
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function extractTextFromFile(file) {
+      if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+        if (!window.pdfjsLib) throw new Error('Library PDF.js belum siap');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        const maxPages = Math.min(pdf.numPages, 15);
+        for (let i = 1; i <= maxPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const strings = content.items.map(item => item.str);
+          fullText += `\n--- Halaman ${i} ---\n` + strings.join(' ');
+        }
+        return fullText.trim();
+      } else {
+        const text = await file.text();
+        return text.slice(0, 25000);
+      }
+    }
+
+    function removeAttachment(id) {
+      pendingAttachments = pendingAttachments.filter(a => a.id !== id);
+      renderAttachmentsPreview();
+    }
+
+    function renderAttachmentsPreview() {
+      const container = document.getElementById('attachments-preview');
+      if (pendingAttachments.length === 0) {
+        container.classList.add('hidden');
+        container.classList.remove('flex');
+        container.innerHTML = '';
+        return;
+      }
+
+      container.classList.remove('hidden');
+      container.classList.add('flex');
+      container.innerHTML = '';
+
+      pendingAttachments.forEach(att => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative group flex items-center gap-2 bg-gemini-surface border border-white/10 rounded-2xl p-1.5 pr-7 max-w-[220px]';
+
+        if (att.type === 'image') {
+          wrapper.innerHTML = `
+            <img src="${att.previewUrl}" alt="${escapeHtml(att.name)}" class="w-11 h-11 object-cover rounded-xl shrink-0" />
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-gemini-text truncate">${escapeHtml(att.name)}</p>
+              <p class="text-[10px] text-blue-400">Foto siap kirim</p>
+            </div>
+          `;
+        } else {
+          wrapper.innerHTML = `
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-gemini-text truncate">${escapeHtml(att.name)}</p>
+              <p class="text-[10px] text-emerald-400">${att.content.length.toLocaleString()} karakter</p>
+            </div>
+          `;
+        }
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.onclick = () => removeAttachment(att.id);
+        closeBtn.className = 'absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 hover:bg-red-500/80 text-white transition';
+        closeBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>`;
+
+        wrapper.appendChild(closeBtn);
+        container.appendChild(wrapper);
+      });
+    }
+
+    // ==========================================
+    // INTERAKSI INPUT & PENGIRIMAN KE OLLAMA
+    // ==========================================
+    function autoResizeTextarea(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 192) + 'px';
+    }
+
+    function handleInputKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function usePromptSuggestion(text) {
+      const input = document.getElementById('prompt-input');
+      input.value = text;
+      autoResizeTextarea(input);
+      input.focus();
+    }
+
+    function setGeneratingState(generating) {
+      isGenerating = generating;
+      const sendBtn = document.getElementById('send-btn');
+      const stopBtn = document.getElementById('stop-btn');
+      if (generating) {
+        sendBtn.classList.add('hidden');
+        stopBtn.classList.remove('hidden');
+      } else {
+        sendBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
+      }
+    }
+
+    function stopGeneration() {
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+      }
+      setGeneratingState(false);
+    }
+
+    // Streaming langsung ke Ollama (/api/chat) — jalur asli, tidak diubah perilakunya
+    async function streamDirectOllama(activeModel, apiMessages, aiMessage, aiBubbleEls) {
+      const endpointUrl = getActiveEndpointUrl();
+      const response = await fetch(`${endpointUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          model: activeModel,
+          messages: apiMessages,
+          stream: true,
+          options: {
+            num_ctx: settings.numCtx
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errText || response.statusText}`);
+      }
+
+      updateStatusDots('online');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.message && parsed.message.content) {
+              accumulatedText += parsed.message.content;
+              aiMessage.content = accumulatedText;
+              updateAssistantBubbleContent(aiBubbleEls, accumulatedText, false);
+              scrollToBottom();
+            }
+          } catch (_) {
+            // Abaikan potongan JSON parsial
+          }
+        }
+      }
+
+      return accumulatedText;
+    }
+
+    async function sendMessage() {
+      if (isGenerating) return;
+      if (isListening) stopSpeechToText();
+
+      const inputEl = document.getElementById('prompt-input');
+      const rawText = inputEl.value.trim();
+      if (!rawText && pendingAttachments.length === 0) return;
+
+      const chat = chats.find(c => c.id === currentChatId);
+      if (!chat) return;
+
+      // Jalur multi-VPS (null = Mode Langsung, atau URL router belum diisi)
+      const routeCfg = getActiveRouteConfig();
+
+      // Pastikan model sudah terisi otomatis jika belum dipilih
+      let activeModel = settings.model || document.getElementById('model-selector').value;
+      if (!activeModel && !routeCfg) {
+        const models = await queryModelsFromServer(getActiveEndpointUrl());
+        if (models && models.length > 0) {
+          discoveredModels = models;
+          activeModel = (models.find(m => m.running) || models[0]).name;
+          settings.model = activeModel;
+          renderModelDropdown(models);
+        }
+      }
+
+      if (!activeModel && !routeCfg) {
+        showToast('Tidak ada model aktif. Cek koneksi endpoint atau tarik model di server.');
+        return;
+      }
+
+      const images = pendingAttachments.filter(a => a.type === 'image');
+      const docs = pendingAttachments.filter(a => a.type === 'doc');
+
+      let promptForModel = rawText;
+      if (docs.length > 0) {
+        const docsContext = docs.map(d => `\n\n[Lampiran File: ${d.name}]\n\`\`\`\n${d.content}\n\`\`\``).join('');
+        promptForModel = (rawText || 'Tolong analisis dan rangkum isi file lampiran berikut:') + docsContext;
+      }
+
+      const userMessage = {
+        role: 'user',
+        displayText: rawText || (images.length ? 'Analisis gambar ini' : 'Analisis file lampiran'),
+        content: promptForModel,
+        images: images.map(img => img.base64),
+        imagePreviews: images.map(img => img.previewUrl),
+        docNames: docs.map(d => d.name)
+      };
+
+      if (chat.messages.length === 0) {
+        chat.title = (rawText || docs[0]?.name || 'Analisis Gambar').slice(0, 36);
+        renderChatHistory();
+      }
+
+      chat.messages.push(userMessage);
+      chat.updatedAt = Date.now();
+
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      pendingAttachments = [];
+      renderAttachmentsPreview();
+
+      document.getElementById('welcome-screen').classList.add('hidden');
+      document.getElementById('messages-list').classList.remove('hidden');
+
+      appendMessageToDOM(userMessage);
+      scrollToBottom();
+
+      const aiMessage = {
+        role: 'assistant',
+        content: '',
+        model: routeCfg ? MODE_LABELS[routeCfg.mode] : activeModel
+      };
+      const aiBubbleEls = appendMessageToDOM(aiMessage, true);
+      scrollToBottom();
+
+      const apiMessages = [];
+      if (settings.systemPrompt) {
+        apiMessages.push({ role: 'system', content: settings.systemPrompt });
+      }
+      chat.messages.forEach(m => {
+        let content = m.content;
+        // Balasan yang hanya berisi gambar/audio tetap dicatat agar konteks percakapan utuh
+        if (!content && m.media && m.media.length) {
+          content = '(Asisten mengirim ' + m.media.map(x => (x.type === 'audio' ? 'audio' : 'gambar')).join(' dan ') + ')';
+        }
+        const payloadMsg = { role: m.role, content: content };
+        if (m.images && m.images.length > 0) {
+          payloadMsg.images = m.images;
+        }
+        apiMessages.push(payloadMsg);
+      });
+
+      setGeneratingState(true);
+      abortController = new AbortController();
+      let phase = 'direct';
+
+      try {
+        let handled = false;
+
+        if (routeCfg) {
+          phase = 'router';
+          handled = await runRoutedChat(routeCfg, {
+            chat, userMessage, apiMessages, aiMessage,
+            els: aiBubbleEls,
+            signal: abortController.signal,
+            rawText,
+            activeModel
+          });
+          phase = 'direct';
+        } else if (settings.routing.mode !== 'direct') {
+          // Mode multi-VPS dipilih, tetapi URL router kosong → tetap langsung ke Ollama
+          aiMessage.routeMode = settings.routing.mode;
+          aiMessage.trace = [{ role: 'direct', label: 'Langsung', model: activeModel, note: 'URL router belum diisi — memakai mode langsung', status: 'ok' }];
+          renderTrace(aiBubbleEls, aiMessage.trace, { modeLabel: routeModeShort(aiMessage.routeMode) });
+        }
+
+        if (!handled) {
+          if (!activeModel) {
+            const models = await queryModelsFromServer(getActiveEndpointUrl());
+            if (models && models.length > 0) {
+              discoveredModels = models;
+              activeModel = (models.find(m => m.running) || models[0]).name;
+              settings.model = activeModel;
+              renderModelDropdown(models);
+            }
+          }
+          if (!activeModel) {
+            throw new Error('Tidak ada model aktif pada endpoint langsung. Pilih model di header atau cek koneksi endpoint.');
+          }
+          aiMessage.model = activeModel;
+          if (aiBubbleEls.modelLabel) aiBubbleEls.modelLabel.textContent = activeModel;
+
+          const accumulatedText = await streamDirectOllama(activeModel, apiMessages, aiMessage, aiBubbleEls);
+
+          updateAssistantBubbleContent(aiBubbleEls, accumulatedText, true);
+          chat.messages.push(aiMessage);
+          chat.updatedAt = Date.now();
+          saveChatsToStorage();
+        }
+
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          aiMessage.content += '\n\n*(Generasi dihentikan oleh pengguna)*';
+          updateAssistantBubbleContent(aiBubbleEls, aiMessage.content, true);
+          chat.messages.push(aiMessage);
+          saveChatsToStorage();
+        } else if (phase === 'router') {
+          renderRouterErrorInBubble(aiBubbleEls, err.message);
+        } else {
+          updateStatusDots('offline');
+          renderErrorInBubble(aiBubbleEls, err.message);
+        }
+      } finally {
+        setGeneratingState(false);
+        abortController = null;
+        if (aiBubbleEls.icon) aiBubbleEls.icon.classList.remove('ai-thinking-icon');
+        // Pastikan indikator "Mengoper…" hilang & jejak final tampil
+        renderTrace(aiBubbleEls, aiMessage.trace || [], { modeLabel: routeModeShort(aiMessage.routeMode) });
+      }
+    }
+
+    // ==========================================
+    // ROUTING MULTI-VPS: MODE, INTENT & PENGIRIMAN KE ROUTER
+    // ==========================================
+    function routeModeShort(mode) {
+      return ROUTE_SCHEMA[mode] ? ROUTE_SCHEMA[mode].short : '';
+    }
+
+    function normalizeHttpUrl(raw) {
+      let u = (raw || '').trim().replace(/\/+$/, '');
+      if (!u) return '';
+      if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+      return u;
+    }
+
+    function normalizeRouterUrl(raw) {
+      const u = (raw || '').trim();
+      if (!u) return '';
+      if (u.startsWith('/') || /^https?:\/\//i.test(u)) return u;
+      return 'https://' + u;
+    }
+
+    // Mengembalikan null bila Mode Langsung dipilih atau URL router kosong
+    function getActiveRouteConfig() {
+      const r = settings.routing;
+      if (!r || r.mode === 'direct' || !ROUTE_SCHEMA[r.mode]) return null;
+      const routerUrl = (r.routerUrl || '').trim();
+      if (!routerUrl) return null;
+      return { mode: r.mode, routerUrl, vps: r[r.mode] };
+    }
+
+    function handleModeChange(val) {
+      if (!ROUTE_MODES.includes(val)) return;
+      settings.routing.mode = val;
+      localStorage.setItem('instabox_ai_settings', JSON.stringify(settings));
+      updateModeUI();
+
+      if (val === 'direct') {
+        showToast('Mode Langsung: dikirim ke endpoint Ollama aktif');
+      } else if (!(settings.routing.routerUrl || '').trim()) {
+        showToast(`${MODE_LABELS[val]} dipilih, tetapi URL router kosong — chat tetap langsung ke Ollama`);
+      } else {
+        showToast(`${MODE_LABELS[val]} aktif`);
+      }
+    }
+
+    function updateModeUI() {
+      const mode = settings.routing.mode;
+      const sel = document.getElementById('mode-selector');
+      if (sel) sel.value = mode;
+
+      const dot = document.getElementById('mode-dot');
+      if (dot) dot.className = `w-2 h-2 rounded-full shrink-0 ${mode === 'direct' ? 'bg-slate-400' : 'bg-blue-400'}`;
+
+      const mic = document.getElementById('mic-btn');
+      if (mic) mic.classList.toggle('hidden', mode !== 'opt3');
+
+      if (mode !== 'opt3' && isListening) stopSpeechToText();
+    }
+
+    // Deteksi niat pengguna (petunjuk untuk router; keputusan akhir tetap di router)
+    function detectIntent(text, hasImages) {
+      const t = (text || '').toLowerCase();
+      const IMG_GEN = String.raw`(?:gambar|foto|ilustrasi|logo|poster|wallpaper|lukisan|sketsa|ikon|icon|image|picture|photo|illustration|artwork|drawing)`;
+      const IMG_ANY = String.raw`(?:${IMG_GEN}|screenshot|tangkapan\s+layar)`;
+
+      const reGen = new RegExp(String.raw`\b(?:buat(?:kan|in)?|bikin(?:kan|in)?|generate|hasilkan|ciptakan|lukis(?:kan)?|gambar(?:kan)?|ilustrasikan|desain(?:kan)?|create|draw|make|render|paint)\b(?:\s+\S+){0,2}?\s+${IMG_GEN}\b`);
+      const reDraw = /\b(?:lukiskan|draw\s+(?:me\s+)?an?\b|paint\s+an?\b)/;
+      const reEdit = new RegExp(String.raw`\b(?:edit|ubah|ganti|hapus|hilangkan|perbaiki|retouch|remove|replace|change|modify|restore|warnai|colorize|crop|potong)\b(?:\s+\S+){0,3}?\s+${IMG_ANY}\b`);
+      const reEditAttached = /\b(?:edit|retouch|warnai|colorize|crop|potong|upscale|(?:hapus|hilangkan|ganti|ubah|remove|replace|change)\s+(?:\S+\s+){0,2}?(?:latar|background|warna|objek|object|wajah|baju|langit))\b/;
+      const reRead = new RegExp(String.raw`\b(?:baca(?:kan)?|jelaskan|deskripsikan|analisis(?:a)?|ocr|ekstrak(?:si)?|transkrip(?:si)?|describe|read|analy[sz]e|explain)\b(?:\s+\S+){0,3}?\s+${IMG_ANY}\b`);
+
+      const ttsPatterns = [
+        /\b(?:tts|text[\s-]?to[\s-]?speech)\b/,
+        /\bteks\s+ke\s+suara\b/,
+        /\b(?:ucapkan|lafalkan|suarakan)\b/,
+        /\bbacakan\b(?:\s+\S+){0,4}?\s+(?:dengan\s+)?(?:suara|audio|lisan)\b/,
+        /\b(?:ubah|jadikan|konversi|buat(?:kan)?)\b(?:\s+\S+){0,3}?\s+(?:ke\s+|jadi\s+|menjadi\s+)?(?:suara|audio|voice|mp3)\b/,
+        /\bread\b(?:\s+\S+){0,3}?\s+(?:aloud|out\s+loud)\b/
+      ];
+
+      const image_gen = reGen.test(t) || reDraw.test(t);
+      const image_edit = !image_gen && (reEdit.test(t) || (hasImages && reEditAttached.test(t)));
+      const image_read = reRead.test(t) || (hasImages && !image_gen && !image_edit);
+      const tts = ttsPatterns.some(re => re.test(t));
+
+      return { has_images: !!hasImages, image_gen, image_edit, image_read, tts };
+    }
+
+    // ---------- Form pengaturan VPS per opsi, router & Firebase ----------
+    function renderRoutingSettingsForm() {
+      const r = settings.routing;
+      const container = document.getElementById('routing-options-container');
+      container.innerHTML = '';
+
+      const inputCls = 'bg-gemini-sidebar border border-white/15 rounded-xl px-3 py-2 text-gemini-text focus:outline-none focus:border-blue-400 font-mono text-xs';
+
+      Object.entries(ROUTE_SCHEMA).forEach(([optKey, def]) => {
+        const details = document.createElement('details');
+        details.className = 'group rounded-2xl bg-gemini-bg border border-white/10 overflow-hidden';
+        if (r.mode === optKey) details.open = true;
+
+        const rolesHtml = def.roles.map(role => {
+          const cfg = (r[optKey] && r[optKey][role.key]) || { url: '', model: '' };
+          return `
+            <div class="space-y-1.5">
+              <p class="text-[11px] font-semibold text-gemini-text">${escapeHtml(role.label)}</p>
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <input type="text" data-vps="${optKey}.${role.key}.url" value="${escapeHtml(cfg.url)}" placeholder="${escapeHtml(role.urlPh)}" class="sm:col-span-7 ${inputCls}" />
+                <input type="text" data-vps="${optKey}.${role.key}.model" value="${escapeHtml(cfg.model)}" placeholder="${escapeHtml(role.modelPh)}" class="sm:col-span-5 ${inputCls}" />
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        details.innerHTML = `
+          <summary class="px-3.5 py-2.5 text-xs font-medium text-gemini-text hover:bg-gemini-hover/40 cursor-pointer flex items-center gap-2 select-none">
+            <svg class="w-3.5 h-3.5 text-blue-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            <span>${escapeHtml(def.title)}</span>
+          </summary>
+          <div class="px-4 py-3 border-t border-white/5 space-y-3">
+            <p class="text-[11px] text-gemini-muted leading-relaxed">${escapeHtml(def.desc)}</p>
+            ${rolesHtml}
+          </div>
+        `;
+        container.appendChild(details);
+      });
+
+      document.getElementById('setting-router-url').value = r.routerUrl || '';
+      document.getElementById('setting-fb-enabled').checked = !!r.firebase.enabled;
+      document.getElementById('setting-fb-url').value = r.firebase.dbUrl || '';
+      document.getElementById('setting-fb-secret').value = r.firebase.secret || '';
+    }
+
+    // Mengembalikan teks peringatan (jika ada) untuk ditampilkan sebagai toast
+    function readRoutingSettingsFromForm() {
+      const r = settings.routing;
+
+      document.querySelectorAll('#routing-options-container [data-vps]').forEach(input => {
+        const [optKey, roleKey, field] = input.dataset.vps.split('.');
+        if (!r[optKey] || !r[optKey][roleKey]) return;
+        r[optKey][roleKey][field] = field === 'url' ? normalizeHttpUrl(input.value) : input.value.trim();
+      });
+
+      r.routerUrl = normalizeRouterUrl(document.getElementById('setting-router-url').value);
+
+      const fbWanted = document.getElementById('setting-fb-enabled').checked;
+      const fbUrl = normalizeHttpUrl(document.getElementById('setting-fb-url').value);
+      const fbSecret = document.getElementById('setting-fb-secret').value.trim();
+      r.firebase = { enabled: fbWanted && !!fbUrl, dbUrl: fbUrl, secret: fbSecret };
+
+      updateModeUI();
+
+      if (fbWanted && !fbUrl) return 'Setelan disimpan, tetapi log Firebase nonaktif: Database URL masih kosong';
+      return '';
+    }
+
+    async function testRouter() {
+      const resultEl = document.getElementById('router-test-result');
+      const url = normalizeRouterUrl(document.getElementById('setting-router-url').value);
+
+      if (!url) {
+        resultEl.className = 'text-[11px] text-amber-300 leading-relaxed';
+        resultEl.textContent = 'URL router kosong — chat akan berjalan dalam Mode Langsung.';
+        return;
+      }
+
+      resultEl.className = 'text-[11px] text-amber-300 leading-relaxed';
+      resultEl.textContent = `Mengecek router ${url}...`;
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ping: true, mode: 'ping' })
+        });
+        if (res.ok) {
+          resultEl.className = 'text-[11px] text-emerald-400 leading-relaxed';
+          resultEl.textContent = `Router merespons dengan baik (HTTP ${res.status}).`;
+        } else if ([404, 405, 501].includes(res.status)) {
+          resultEl.className = 'text-[11px] text-red-400 leading-relaxed';
+          resultEl.textContent = `Endpoint router tidak ditemukan (HTTP ${res.status}). Chat akan dialihkan ke Mode Langsung.`;
+        } else {
+          resultEl.className = 'text-[11px] text-amber-300 leading-relaxed';
+          resultEl.textContent = `Backend menjawab HTTP ${res.status}. Periksa pengaturan VPS di sisi router.`;
+        }
+      } catch (err) {
+        resultEl.className = 'text-[11px] text-red-400 leading-relaxed';
+        resultEl.textContent = `Router tidak terjangkau (${err.message}). Periksa URL, CORS, atau jalankan backend router.`;
+      }
+    }
+
+    // ---------- Log routing ke Firebase Realtime Database (opsional) ----------
+    function firebaseLogUrl(dbUrl, secret) {
+      return `${dbUrl}/routing_logs.json` + (secret ? `?auth=${encodeURIComponent(secret)}` : '');
+    }
+
+    function logRoutingEvent(entry) {
+      const fb = settings.routing && settings.routing.firebase;
+      if (!fb || !fb.enabled || !fb.dbUrl) return;
+      try {
+        fetch(firebaseLogUrl(fb.dbUrl, fb.secret), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entry),
+          keepalive: true
+        })
+          .then(res => { if (!res.ok) console.warn('Log routing Firebase ditolak: HTTP', res.status); })
+          .catch(err => console.warn('Log routing Firebase gagal:', err));
+      } catch (err) {
+        console.warn('Log routing Firebase gagal:', err);
+      }
+    }
+
+    async function testFirebaseLog() {
+      const resultEl = document.getElementById('fb-test-result');
+      const dbUrl = normalizeHttpUrl(document.getElementById('setting-fb-url').value);
+      const secret = document.getElementById('setting-fb-secret').value.trim();
+
+      if (!dbUrl) {
+        resultEl.className = 'text-[11px] text-red-400 leading-relaxed';
+        resultEl.textContent = 'Isi Database URL Firebase terlebih dahulu.';
+        return;
+      }
+
+      resultEl.className = 'text-[11px] text-amber-300 leading-relaxed';
+      resultEl.textContent = 'Menulis catatan uji ke /routing_logs...';
+
+      try {
+        const res = await fetch(firebaseLogUrl(dbUrl, secret), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ts: Date.now(), test: true, source: 'instabox-ai' })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        resultEl.className = 'text-[11px] text-emerald-400 leading-relaxed';
+        resultEl.textContent = 'Berhasil: catatan uji tertulis di /routing_logs.';
+      } catch (err) {
+        resultEl.className = 'text-[11px] text-red-400 leading-relaxed';
+        resultEl.textContent = `Gagal menulis log (${err.message}). Periksa Database URL, secret, dan Rules database.`;
+      }
+    }
+
+    // ---------- Indikator jejak operan (trace) ----------
+    const TRACE_ARROW = '<svg class="w-3 h-3 text-gemini-muted shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+
+    function normalizeTraceStep(raw) {
+      if (raw == null) return null;
+      if (typeof raw === 'string') return { role: 'router', label: raw.slice(0, 60) };
+      if (typeof raw !== 'object') return null;
+      const role = String(raw.role || raw.kind || raw.vps || 'router').toLowerCase();
+      return {
+        role: TRACE_ROLE_META[role] ? role : 'router',
+        label: raw.label ? String(raw.label).slice(0, 40) : '',
+        model: raw.model ? String(raw.model).slice(0, 48) : '',
+        url: raw.url ? String(raw.url).replace(/^https?:\/\//i, '').slice(0, 80) : '',
+        ms: Number(raw.ms) > 0 ? Number(raw.ms) : 0,
+        note: raw.note ? String(raw.note).slice(0, 200) : '',
+        status: raw.status === 'error' ? 'error' : 'ok'
+      };
+    }
+
+    function traceChipHtml(step) {
+      const meta = TRACE_ROLE_META[step.role] || TRACE_ROLE_META.router;
+      const bits = [step.label || meta.label];
+      if (step.model) bits.push(step.model);
+      if (typeof step.ms === 'number' && step.ms > 0) bits.push((step.ms / 1000).toFixed(1) + 's');
+      const tip = [step.note, step.url].filter(Boolean).join(' • ');
+      const isErr = step.status === 'error';
+      const chipCls = isErr ? 'text-red-200 bg-red-500/10 border-red-400/30' : meta.chip;
+      const dotCls = isErr ? 'bg-red-400' : meta.dot;
+      return `<span title="${escapeHtml(tip)}" class="inline-flex items-center gap-1.5 max-w-[240px] px-2 py-0.5 rounded-full border text-[11px] ${chipCls}"><span class="w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}"></span><span class="truncate">${escapeHtml(bits.join(' · '))}</span></span>`;
+    }
+
+    function renderTrace(els, trace, opts = {}) {
+      if (!els || !els.traceContainer) return;
+      const box = els.traceContainer;
+      const items = Array.isArray(trace) ? trace : [];
+
+      if (items.length === 0 && !opts.running) {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+
+      const parts = [];
+      if (opts.modeLabel) {
+        parts.push(`<span class="text-[10px] font-semibold uppercase tracking-wider text-gemini-muted mr-0.5">${escapeHtml(opts.modeLabel)}</span>`);
+      }
+      items.forEach((step, idx) => {
+        if (idx > 0) parts.push(TRACE_ARROW);
+        parts.push(traceChipHtml(step));
+      });
+      if (opts.running) {
+        if (items.length > 0) parts.push(TRACE_ARROW);
+        parts.push('<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/10 text-[11px] text-gemini-muted animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-gemini-muted"></span>Mengoper…</span>');
+      }
+
+      box.innerHTML = parts.join('');
+      box.classList.remove('hidden');
+    }
+
+    // ---------- Media balasan (gambar & audio) ----------
+    function normalizeMediaSrc(val, kind) {
+      if (typeof val !== 'string') return '';
+      const v = val.trim();
+      if (!v) return '';
+      if (/^(https?:\/\/|blob:)/i.test(v)) return v;
+      if (v.startsWith('/') && !v.startsWith('//')) return v;
+      if (/^data:(image|audio)\//i.test(v)) return v;
+      if (v.length > 64 && /^[A-Za-z0-9+/=\s]+$/.test(v)) {
+        const prefix = kind === 'audio' ? 'data:audio/mpeg;base64,' : 'data:image/png;base64,';
+        return prefix + v.replace(/\s+/g, '');
+      }
+      return '';
+    }
+
+    function addMedia(state, kind, val) {
+      const src = normalizeMediaSrc(val, kind);
+      if (!src) return;
+      if (state.media.some(m => m.src === src)) return;
+      state.media.push({ type: kind, src });
+    }
+
+    // Data URL besar & blob: tidak disimpan ke localStorage (bisa memenuhi kuota / kedaluwarsa)
+    function compactMediaForStorage(media) {
+      return (media || []).map(m => {
+        const tooBig = m.src.startsWith('data:') && m.src.length > 150000;
+        const volatile = m.src.startsWith('blob:');
+        return { type: m.type, src: (tooBig || volatile) ? null : m.src };
+      });
+    }
+
+    function renderMedia(els, media, autoplay = false) {
+      const box = els && els.mediaContainer;
+      if (!box) return;
+      box.innerHTML = '';
+
+      const list = Array.isArray(media) ? media : [];
+      if (list.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+      box.classList.remove('hidden');
+
+      let lastAudio = null;
+      list.forEach(item => {
+        if (!item.src) {
+          const note = document.createElement('p');
+          note.className = 'text-xs text-gemini-muted italic';
+          note.textContent = item.type === 'audio'
+            ? 'Audio tidak disimpan di riwayat — minta ulang untuk mendengarkannya lagi.'
+            : 'Gambar tidak disimpan di riwayat — minta ulang untuk membuatnya lagi.';
+          box.appendChild(note);
+          return;
+        }
+
+        if (item.type === 'audio') {
+          const wrap = document.createElement('div');
+          wrap.className = 'p-2 rounded-2xl bg-gemini-sidebar border border-white/10 max-w-md';
+          const audio = document.createElement('audio');
+          audio.controls = true;
+          audio.preload = 'auto';
+          audio.className = 'w-full h-10';
+          audio.src = item.src;
+          wrap.appendChild(audio);
+          box.appendChild(wrap);
+          lastAudio = audio;
+        } else {
+          const wrap = document.createElement('div');
+          wrap.className = 'space-y-1.5';
+          const img = document.createElement('img');
+          img.src = item.src;
+          img.alt = 'Gambar hasil AI';
+          img.className = 'max-h-96 max-w-full rounded-2xl border border-white/10 object-contain shadow-md';
+          const link = document.createElement('a');
+          link.href = item.src;
+          link.download = 'instabox-gambar.png';
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.className = 'inline-block text-[11px] text-blue-400 hover:text-blue-300 transition';
+          link.textContent = 'Unduh gambar';
+          wrap.appendChild(img);
+          wrap.appendChild(link);
+          box.appendChild(wrap);
+        }
+      });
+
+      if (autoplay && lastAudio) {
+        const p = lastAudio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => showToast('Tekan tombol putar untuk mendengarkan audio'));
+        }
+      }
+    }
+
+    // ---------- Pemrosesan respons router ----------
+    // Mengembalikan true bila `ev` adalah objek yang valid
+    function applyRouteEvent(ev, state) {
+      if (!ev || typeof ev !== 'object' || Array.isArray(ev)) return false;
+
+      if (ev.error) {
+        state.error = typeof ev.error === 'string' ? ev.error : (ev.error.message || JSON.stringify(ev.error));
+      }
+
+      if (ev.trace !== undefined && ev.trace !== null) {
+        if (Array.isArray(ev.trace)) {
+          state.trace = ev.trace.map(normalizeTraceStep).filter(Boolean);
+        } else {
+          const step = normalizeTraceStep(ev.trace);
+          if (step) state.trace.push(step);
+        }
+      }
+
+      let chunk = '';
+      if (ev.message && typeof ev.message.content === 'string') chunk = ev.message.content;
+      else if (typeof ev.content === 'string') chunk = ev.content;
+      else if (typeof ev.response === 'string') chunk = ev.response;
+      if (chunk) state.text += chunk;
+
+      [ev.image, ev.image_url, ev.image_base64].forEach(v => addMedia(state, 'image', v));
+      if (Array.isArray(ev.images)) {
+        ev.images.forEach(v => addMedia(state, 'image', typeof v === 'string' ? v : (v && (v.url || v.b64_json || v.base64))));
+      }
+      [ev.audio, ev.audio_url, ev.audio_base64].forEach(v => addMedia(state, 'audio', v));
+
+      return true;
+    }
+
+    async function readRouteStream(response, state, onUpdate) {
+      let applied = 0;
+      let fullText = '';
+
+      const handleLine = (line) => {
+        let l = line.trim();
+        if (!l) return;
+        if (l.startsWith('data:')) l = l.slice(5).trim();
+        if (!l || l === '[DONE]' || l.startsWith('event:') || l.startsWith(':')) return;
+        try {
+          if (applyRouteEvent(JSON.parse(l), state)) applied++;
+        } catch (_) {
+          // Abaikan baris non-JSON
+        }
+      };
+
+      if (!response.body) {
+        fullText = await response.text();
+        fullText.split('\n').forEach(handleLine);
+      } else {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          fullText += chunk;
+          buffer += chunk;
+
+          let nl;
+          while ((nl = buffer.indexOf('\n')) !== -1) {
+            handleLine(buffer.slice(0, nl));
+            buffer = buffer.slice(nl + 1);
+          }
+          onUpdate();
+        }
+        if (buffer.trim()) handleLine(buffer);
+      }
+
+      // JSON tunggal (mis. hasil pretty-print multi-baris)
+      if (applied === 0 && fullText.trim()) {
+        try { applyRouteEvent(JSON.parse(fullText), state); } catch (_) { /* bukan JSON */ }
+      }
+    }
+
+    // Mengirim ke router. Mengembalikan true bila sudah ditangani & disimpan,
+    // false bila router tidak tersedia (pemanggil melanjutkan ke mode langsung).
+    async function runRoutedChat(cfg, ctx) {
+      const { chat, userMessage, apiMessages, aiMessage, els, signal, rawText, activeModel } = ctx;
+      const modeShort = routeModeShort(cfg.mode);
+      const startedAt = performance.now();
+      const state = { text: '', trace: [], media: [], error: '' };
+      const intent = detectIntent(rawText, (userMessage.images || []).length > 0);
+      let status = 'ok';
+      let lastError = '';
+      let mediaRendered = 0;
+
+      aiMessage.routeMode = cfg.mode;
+      renderTrace(els, [], { running: true, modeLabel: modeShort });
+
+      const refreshLive = () => {
+        aiMessage.content = state.text;
+        aiMessage.trace = state.trace;
+        if (state.text) updateAssistantBubbleContent(els, state.text, false);
+        renderTrace(els, state.trace, { running: true, modeLabel: modeShort });
+        if (state.media.length !== mediaRendered) {
+          renderMedia(els, state.media, true);
+          mediaRendered = state.media.length;
+        }
+        scrollToBottom();
+      };
+
+      const fallbackToDirect = (reason) => {
+        status = 'fallback';
+        lastError = reason;
+        state.trace = [{ role: 'direct', label: 'Langsung', model: activeModel || '', note: `${reason} — dialihkan ke mode langsung`, status: 'ok' }];
+        aiMessage.trace = state.trace;
+        if (els.modelLabel) els.modelLabel.textContent = activeModel || 'Ollama';
+        renderTrace(els, state.trace, { running: true, modeLabel: modeShort });
+        showToast('Router tidak tersedia — memakai mode langsung ke Ollama');
+        return false;
+      };
+
+      const payload = {
+        mode: cfg.mode,
+        session: chat.id,
+        stream: true,
+        prompt: userMessage.content,
+        images: userMessage.images || [],
+        intent,
+        messages: apiMessages,
+        vps: cfg.vps,
+        options: { num_ctx: settings.numCtx },
+        hints: ROUTE_HINTS
+      };
+
+      try {
+        let response;
+        try {
+          response = await fetch(cfg.routerUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal,
+            body: JSON.stringify(payload)
+          });
+        } catch (err) {
+          if (err.name === 'AbortError') throw err;
+          return fallbackToDirect('Router tidak terjangkau');
+        }
+
+        if (!response.ok) {
+          const bodyText = await response.text().catch(() => '');
+          if ([404, 405, 501].includes(response.status)) {
+            return fallbackToDirect(`Router belum tersedia (HTTP ${response.status})`);
+          }
+          throw new Error(`Router HTTP ${response.status}: ${(bodyText || response.statusText || '').slice(0, 300)}`);
+        }
+
+        const ctype = (response.headers.get('content-type') || '').toLowerCase();
+        if (ctype.startsWith('audio/') || ctype.startsWith('image/')) {
+          const blob = await response.blob();
+          addMedia(state, ctype.startsWith('audio/') ? 'audio' : 'image', URL.createObjectURL(blob));
+        } else {
+          await readRouteStream(response, state, refreshLive);
+        }
+        refreshLive();
+
+        if (state.error && !state.text && state.media.length === 0) {
+          throw new Error(state.error);
+        }
+        if (!state.text && state.media.length === 0) {
+          throw new Error('Router tidak mengembalikan teks, gambar, maupun audio.');
+        }
+        if (state.error) {
+          state.text += `\n\n*(Router melaporkan kesalahan: ${state.error})*`;
+        }
+        if (state.trace.length === 0) {
+          state.trace = [{ role: 'router', label: 'Router', note: 'Router tidak mengirim jejak operan', status: 'ok' }];
+        }
+
+        aiMessage.content = state.text;
+        aiMessage.trace = state.trace;
+        aiMessage.media = compactMediaForStorage(state.media);
+
+        if (state.text) {
+          updateAssistantBubbleContent(els, state.text, true);
+        } else {
+          els.responseBody.innerHTML = '';
+        }
+        renderTrace(els, state.trace, { modeLabel: modeShort });
+        if (state.media.length !== mediaRendered) renderMedia(els, state.media, true);
+
+        chat.messages.push(aiMessage);
+        chat.updatedAt = Date.now();
+        saveChatsToStorage();
+        return true;
+
+      } catch (err) {
+        const aborted = err.name === 'AbortError';
+        status = aborted ? 'aborted' : 'error';
+        lastError = aborted ? '' : (err.message || 'error');
+        if (!aborted) {
+          state.trace.push({ role: 'router', label: 'Gagal', note: lastError.slice(0, 200), status: 'error' });
+        }
+        aiMessage.content = state.text;
+        aiMessage.trace = state.trace;
+        aiMessage.media = compactMediaForStorage(state.media);
+        throw err;
+
+      } finally {
+        logRoutingEvent({
+          ts: Date.now(),
+          mode: cfg.mode,
+          session: chat.id,
+          status,
+          ms: Math.round(performance.now() - startedAt),
+          router: cfg.routerUrl,
+          intent,
+          promptChars: (userMessage.content || '').length,
+          images: (userMessage.images || []).length,
+          trace: state.trace.map(s => ({
+            role: s.role,
+            label: s.label || undefined,
+            model: s.model || undefined,
+            ms: s.ms || undefined,
+            status: s.status || 'ok'
+          })),
+          error: lastError ? lastError.slice(0, 200) : undefined
+        });
+      }
+    }
+
+    function renderRouterErrorInBubble(els, errorMessage) {
+      els.responseBody.innerHTML = `
+        <div class="p-4 rounded-2xl bg-red-500/10 border border-red-500/25 text-sm text-red-200 space-y-2">
+          <p class="font-semibold text-red-300">Router multi-VPS gagal memproses permintaan</p>
+          <p class="text-xs font-mono bg-black/30 p-2 rounded-lg text-red-300">${escapeHtml(errorMessage)}</p>
+          <ul class="text-xs text-red-200/85 list-disc ml-4 space-y-1">
+            <li>Periksa URL router di <b>Setelan</b> dan pastikan backend berjalan serta bisa menjangkau semua VPS pada opsi ini.</li>
+            <li>Jika router berada di domain lain, aktifkan CORS di backend router.</li>
+            <li>Sementara waktu, pilih <b>Mode Langsung</b> pada pemilih mode di header.</li>
+          </ul>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // SPEECH-TO-TEXT (MIKROFON) — OPSI 3
+    // ==========================================
+    let speechRecognizer = null;
+    let isListening = false;
+
+    function setListeningUI(on) {
+      isListening = on;
+      const btn = document.getElementById('mic-btn');
+      if (!btn) return;
+      btn.classList.toggle('text-rose-400', on);
+      btn.classList.toggle('bg-rose-500/15', on);
+      btn.classList.toggle('animate-pulse', on);
+      btn.classList.toggle('text-gemini-muted', !on);
+      btn.title = on ? 'Ketuk untuk berhenti mendengarkan' : 'Bicara untuk mengetik (Speech-to-Text)';
+    }
+
+    function stopSpeechToText() {
+      if (speechRecognizer) {
+        try { speechRecognizer.stop(); } catch (_) { /* sudah berhenti */ }
+      }
+      setListeningUI(false);
+    }
+
+    function toggleSpeechToText() {
+      if (isListening) {
+        stopSpeechToText();
+        return;
+      }
+
+      const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Ctor) {
+        showToast('Browser ini belum mendukung Speech-to-Text (coba Chrome/Edge)');
+        return;
+      }
+
+      const input = document.getElementById('prompt-input');
+      const baseText = input.value ? input.value.replace(/\s+$/, '') + ' ' : '';
+
+      const rec = new Ctor();
+      rec.lang = 'id-ID';
+      rec.interimResults = true;
+      rec.continuous = false;
+
+      rec.onresult = (e) => {
+        const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+        input.value = baseText + transcript;
+        autoResizeTextarea(input);
+      };
+
+      rec.onerror = (e) => {
+        const messages = {
+          'not-allowed': 'Izin mikrofon ditolak (butuh HTTPS dan izin browser)',
+          'service-not-allowed': 'Izin mikrofon ditolak (butuh HTTPS dan izin browser)',
+          'no-speech': 'Tidak ada suara terdengar',
+          'audio-capture': 'Mikrofon tidak ditemukan',
+          'network': 'Speech-to-Text butuh koneksi internet'
+        };
+        if (e.error !== 'aborted') {
+          showToast(messages[e.error] || `Speech-to-Text gagal (${e.error})`);
+        }
+      };
+
+      rec.onend = () => {
+        setListeningUI(false);
+        input.focus();
+      };
+
+      try {
+        rec.start();
+        speechRecognizer = rec;
+        setListeningUI(true);
+        showToast('Mendengarkan… silakan bicara');
+      } catch (err) {
+        setListeningUI(false);
+        showToast('Tidak dapat memulai mikrofon');
+      }
+    }
+
+    // ==========================================
+    // RENDERING PESAN & BLOK <THINK>
+    // ==========================================
+    function appendMessageToDOM(msg, isStreaming = false) {
+      const container = document.getElementById('messages-list');
+      const wrapper = document.createElement('div');
+
+      if (msg.role === 'user') {
+        wrapper.className = 'flex flex-col items-end space-y-2';
+
+        let attachmentsHTML = '';
+        if ((msg.imagePreviews && msg.imagePreviews.length) || (msg.docNames && msg.docNames.length)) {
+          attachmentsHTML += '<div class="flex flex-wrap justify-end gap-2">';
+          (msg.imagePreviews || []).forEach(src => {
+            attachmentsHTML += `<img src="${src}" class="max-h-52 rounded-2xl border border-white/10 object-contain shadow-md" />`;
+          });
+          (msg.docNames || []).forEach(name => {
+            attachmentsHTML += `
+              <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-gemini-surface border border-white/10 text-xs text-emerald-300">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>${escapeHtml(name)}</span>
+              </div>
+            `;
+          });
+          attachmentsHTML += '</div>';
+        }
+
+        wrapper.innerHTML = `
+          ${attachmentsHTML}
+          <div class="bg-gemini-surface text-gemini-text px-4 py-3 rounded-3xl rounded-tr-md max-w-[85%] sm:max-w-[75%] text-sm sm:text-base leading-relaxed whitespace-pre-wrap shadow-xs">
+            ${escapeHtml(msg.displayText || msg.content)}
+          </div>
+        `;
+        container.appendChild(wrapper);
+        return null;
+      } else {
+        wrapper.className = 'flex items-start gap-3.5';
+        wrapper.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500/20 to-purple-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="ai-sparkle-icon w-4 h-4 text-blue-400 ${isStreaming ? 'ai-thinking-icon' : ''}" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C12.3 7.3 16.7 11.7 22 12C16.7 12.3 12.3 16.7 12 22C11.7 16.7 7.3 12.3 2 12C7.3 11.7 11.7 7.3 12 2Z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="model-label text-xs font-semibold text-gemini-muted">${escapeHtml(msg.model || settings.model || 'Ollama')}</span>
+            </div>
+            <div class="trace-container hidden flex flex-wrap items-center gap-1.5"></div>
+            <div class="think-container hidden"></div>
+            <div class="response-body markdown-body text-sm sm:text-base text-gemini-text">
+              ${isStreaming ? '<span class="inline-block w-2 h-4 bg-blue-400 animate-pulse rounded-xs"></span>' : ''}
+            </div>
+            <div class="media-container hidden space-y-2"></div>
+          </div>
+        `;
+        container.appendChild(wrapper);
+
+        const els = {
+          icon: wrapper.querySelector('.ai-sparkle-icon'),
+          modelLabel: wrapper.querySelector('.model-label'),
+          traceContainer: wrapper.querySelector('.trace-container'),
+          thinkContainer: wrapper.querySelector('.think-container'),
+          responseBody: wrapper.querySelector('.response-body'),
+          mediaContainer: wrapper.querySelector('.media-container')
+        };
+
+        if (msg.trace && msg.trace.length) {
+          renderTrace(els, msg.trace, { modeLabel: routeModeShort(msg.routeMode) });
+        }
+        if (msg.media && msg.media.length) {
+          renderMedia(els, msg.media, false);
+        }
+
+        if (!isStreaming && msg.content) {
+          updateAssistantBubbleContent(els, msg.content, true);
+        }
+        return els;
+      }
+    }
+
+    function updateAssistantBubbleContent(els, rawContent, isFinal) {
+      let thinkText = '';
+      let mainText = rawContent;
+
+      const thinkStart = rawContent.indexOf('<think>');
+      if (thinkStart !== -1) {
+        const thinkEnd = rawContent.indexOf('</think>');
+        if (thinkEnd !== -1) {
+          thinkText = rawContent.slice(thinkStart + 7, thinkEnd).trim();
+          mainText = (rawContent.slice(0, thinkStart) + rawContent.slice(thinkEnd + 8)).trim();
+        } else {
+          thinkText = rawContent.slice(thinkStart + 7).trim();
+          mainText = rawContent.slice(0, thinkStart).trim();
+        }
+      }
+
+      if (mainText.includes(ROUTE_HINTS.handoff_marker)) {
+        mainText = mainText.split(ROUTE_HINTS.handoff_marker).join('').trim();
+      }
+
+      if (thinkText) {
+        els.thinkContainer.classList.remove('hidden');
+        const isStillThinking = rawContent.includes('<think>') && !rawContent.includes('</think>');
+        els.thinkContainer.innerHTML = `
+          <details ${isStillThinking ? 'open' : ''} class="group rounded-2xl bg-gemini-sidebar border border-white/10 overflow-hidden">
+            <summary class="px-3.5 py-2 text-xs font-medium text-gemini-muted hover:text-gemini-text cursor-pointer flex items-center gap-2 select-none">
+              <svg class="w-3.5 h-3.5 text-purple-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+              <span>${isStillThinking ? 'AI sedang berpikir...' : 'Lihat proses berpikir AI'}</span>
+            </summary>
+            <div class="px-4 py-2.5 text-xs text-gemini-muted/90 border-t border-white/5 whitespace-pre-wrap leading-relaxed font-mono bg-black/20">
+              ${escapeHtml(thinkText)}
+            </div>
+          </details>
+        `;
+      }
+
+      if (mainText) {
+        els.responseBody.innerHTML = marked.parse(mainText);
+        if (isFinal) {
+          enhanceCodeBlocks(els.responseBody);
+        }
+      } else if (!isFinal) {
+        els.responseBody.innerHTML = '<span class="text-xs text-gemini-muted italic">Menyusun jawaban...</span>';
+      }
+    }
+
+    function enhanceCodeBlocks(container) {
+      container.querySelectorAll('pre').forEach(pre => {
+        if (pre.dataset.enhanced) return;
+        pre.dataset.enhanced = 'true';
+
+        const codeEl = pre.querySelector('code');
+        if (codeEl && window.hljs) {
+          hljs.highlightElement(codeEl);
+        }
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between px-3.5 py-1.5 bg-white/5 border-b border-white/10 text-xs text-gemini-muted';
+        const langClass = Array.from(codeEl?.classList || []).find(c => c.startsWith('language-'));
+        const langName = langClass ? langClass.replace('language-', '') : 'kode';
+
+        header.innerHTML = `
+          <span class="font-mono text-[11px] uppercase">${escapeHtml(langName)}</span>
+          <button type="button" class="copy-code-btn flex items-center gap-1 hover:text-white transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span>Salin</span>
+          </button>
+        `;
+
+        const copyBtn = header.querySelector('.copy-code-btn');
+        copyBtn.onclick = () => {
+          const textToCopy = codeEl ? codeEl.innerText : pre.innerText;
+          copyTextFallback(textToCopy);
+          copyBtn.querySelector('span').textContent = 'Tersalin!';
+          setTimeout(() => (copyBtn.querySelector('span').textContent = 'Salin'), 2000);
+        };
+
+        pre.insertBefore(header, pre.firstChild);
+      });
+    }
+
+    function renderErrorInBubble(els, errorMessage) {
+      els.responseBody.innerHTML = `
+        <div class="p-4 rounded-2xl bg-red-500/10 border border-red-500/25 text-sm text-red-200 space-y-2">
+          <p class="font-semibold text-red-300">Gagal terhubung ke Ollama di VPS InstaBox</p>
+          <p class="text-xs font-mono bg-black/30 p-2 rounded-lg text-red-300">${escapeHtml(errorMessage)}</p>
+          <ul class="text-xs text-red-200/85 list-disc ml-4 space-y-1">
+            <li>Pastikan URL Endpoint aktif di menu <b>Setelan Endpoint VPS</b> atau dropdown atas sudah sesuai dengan URL publik port <code>11434</code> InstaBox Anda.</li>
+            <li>Pastikan di terminal VPS Anda menjalankan Ollama dengan CORS terbuka: <code>OLLAMA_ORIGINS="*" OLLAMA_HOST=0.0.0.0:11434 ollama serve</code></li>
+            <li>Jika VPS baru saja tertidur (idle/sleep), tunggu beberapa detik lalu kirim ulang pesan.</li>
+          </ul>
+        </div>
+      `;
+    }
+
+    function copyTextFallback(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function scrollToBottom() {
+      const container = document.getElementById('chat-scroll-container');
+      container.scrollTop = container.scrollHeight;
+    }
+  </script>
+</body>
+</html>
