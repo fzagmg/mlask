@@ -549,7 +549,7 @@ Respons: NDJSON (1 JSON per baris) atau JSON tunggal
     const INITIAL_ENDPOINTS = [
       {
         id: 'ep_default',
-        label: 'InstaBox Utama',
+        label: 'qwen 2.5 coder 7b',
         url: 'https://11434-agq7y7vjykplezojspm3uax7zy.instabox.tech',
         status: 'unknown'
       }
@@ -614,18 +614,29 @@ Respons: NDJSON (1 JSON per baris) atau JSON tunggal
       router: { label: 'Router',   dot: 'bg-slate-400',   chip: 'text-slate-200 bg-slate-500/10 border-slate-400/25' }
     };
 
-    function makeDefaultRouting() {
-      const r = {
-        mode: 'direct',
-        routerUrl: '/api/route',
-        firebase: { enabled: false, dbUrl: '', secret: '' }
-      };
-      Object.entries(ROUTE_SCHEMA).forEach(([optKey, def]) => {
-        r[optKey] = {};
-        def.roles.forEach(role => { r[optKey][role.key] = { url: '', model: '' }; });
-      });
-      return r;
-    }
+function makeDefaultRouting() {
+  const r = {
+    mode: 'opt1', // langsung aktifkan Opsi 1 saat halaman dibuka
+    routerUrl: 'https://3000-agracia42y65m3j7imgf2dkrqa.instabox.tech',
+    firebase: { enabled: false, dbUrl: '', secret: '' }
+  };
+  Object.entries(ROUTE_SCHEMA).forEach(([optKey, def]) => {
+    r[optKey] = {};
+    def.roles.forEach(role => { r[optKey][role.key] = { url: '', model: '' }; });
+  });
+
+  // Isi default VPS 1 & VPS 2 untuk Opsi 1
+  r.opt1.coder = {
+    url: 'https://11434-agq7hkhociec6qi73i6sj3s2l4.instabox.tech',
+    model: 'qwen2.5-coder:7b'
+  };
+  r.opt1.vision = {
+    url: 'https://11434-agq7y7vjykplezojspm3uax7zy.instabox.tech',
+    model: 'qwen3.5:4b'
+  };
+
+  return r;
+}
 
     function normalizeRouting(saved) {
       const base = makeDefaultRouting();
