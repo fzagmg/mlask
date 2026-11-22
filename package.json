@@ -1,9 +1,14 @@
 {
   "name": "instabox-ai-router",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "Chat AI bergaya Gemini dengan routing otomatis antar-VPS (VPS 1 obrolan, VPS 2 vision/TTS, VPS 3 Hermes Agent untuk kode)",
   "main": "server.js",
+  "private": true,
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "cors": "^2.8.5",
